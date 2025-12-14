@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nouvelle Facture Client - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-file-invoice-dollar"></i> Nouvelle Facture Client</h1>
+                    <p class="subtitle">Facture pour les grandes entreprises</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('nouvelle_facture_client') }}" class="nav-link active">
+                <i class="fas fa-file-invoice-dollar"></i> Nouvelle Facture
+            </a>
+            <a href="{{ url_for('nouvelle_facture_employe') }}" class="nav-link">
+                <i class="fas fa-user-tie"></i> Facture Employé
+            </a>
+            <a href="{{ url_for('employes') }}" class="nav-link">
+                <i class="fas fa-users"></i> Employés
+            </a>
+            <a href="{{ url_for('clients') }}" class="nav-link">
+                <i class="fas fa-building"></i> Clients
+            </a>
+            <a href="{{ url_for('factures') }}" class="nav-link">
+                <i class="fas fa-receipt"></i> Toutes les Factures
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <form id="factureForm" action="{{ url_for('generer_facture_client') }}" method="POST">
+                <div class="form-grid">
+                    <div class="form-section">
+                        <h2><i class="fas fa-info-circle"></i> Informations de base</h2>
+                        
+                        <div class="form-group">
+                            <label for="numero_facture">Numéro de facture</label>
+                            <input type="text" id="numero_facture" name="numero_facture"
+                                   value="{{ numero_auto }}" required readonly class="form-control">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="date_facture">Date de facturation</label>
+                            <input type="text" id="date_facture" name="date_facture"
+                                   value="{{ now.strftime('%d/%m/%Y') }}" required class="form-control">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="date_debut">Date début période</label>
+                                <input type="date" id="date_debut" name="date_debut" class="form-control">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="date_fin">Date fin période</label>
+                                <input type="date" id="date_fin" name="date_fin" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="tva-toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="appliquer_tva" name="appliquer_tva" checked onchange="calculerTotaux()">
+                                    <span class="slider"></span>
+                                </label>
+                                <label for="appliquer_tva" class="tva-label">
+                                    <i class="fas fa-percent"></i> Appliquer la TVA ({{ tva }}%)
+                                </label>
+                            </div>
+                            <small class="help-text">Désactivez si le client a un numéro de TVA intracommunautaire</small>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h2><i class="fas fa-building"></i> Client</h2>
+                        
+                        <div class="form-group">
+                            <label for="client_id">
+                                Sélectionner un client *
+                                <button type="button" class="btn-add-inline" onclick="afficherFormulaireNouveauClient()">
+                                    <i class="fas fa-plus"></i> Nouveau client
+                                </button>
+                            </label>
+                            <select name="client_id" id="client_id" class="form-control" required>
+                                <option value="">— Sélectionner un client —</option>
+                                {% for client in clients %}
+                                <option value="{{ client.id }}">{{ client.nom }} - {{ client.ville }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div id="nouveauClientForm" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #2ecc71;">
+                            <h3 style="margin: 0 0 15px 0; color: #2ecc71;">
+                                <i class="fas fa-user-plus"></i> Nouveau Client
+                            </h3>
+                            
+                            <div class="form-group">
+                                <label for="nouveau_client_nom">Nom du client *</label>
+                                <input type="text" id="nouveau_client_nom" class="form-control">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="nouveau_client_ville">Ville</label>
+                                    <input type="text" id="nouveau_client_ville" class="form-control">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="nouveau_client_telephone">Téléphone</label>
+                                    <input type="tel" id="nouveau_client_telephone" class="form-control">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="nouveau_client_adresse">Adresse</label>
+                                <input type="text" id="nouveau_client_adresse" class="form-control">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="nouveau_client_email">Email</label>
+                                    <input type="email" id="nouveau_client_email" class="form-control">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="nouveau_client_siret">SIRET</label>
+                                    <input type="text" id="nouveau_client_siret" class="form-control">
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions-inline">
+                                <button type="button" class="btn-secondary" onclick="annulerNouveauClient()">
+                                    <i class="fas fa-times"></i> Annuler
+                                </button>
+                                <button type="button" class="btn-primary" onclick="enregistrerNouveauClient()">
+                                    <i class="fas fa-save"></i> Enregistrer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-list"></i> Articles et services</h2>
+                        <button type="button" class="btn-add" onclick="ajouterArticle()">
+                            <i class="fas fa-plus"></i> Ajouter un article
+                        </button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="data-table" id="articlesTable">
+                            <thead>
+                                <tr>
+                                    <th width="40%">Description</th>
+                                    <th width="15%">Quantité</th>
+                                    <th width="20%">Prix HT (€)</th>
+                                    <th width="20%">Total HT (€)</th>
+                                    <th width="5%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="articlesBody"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-right"><strong>Total HT</strong></td>
+                                    <td><strong id="totalHT">0.00</strong> €</td>
+                                    <td></td>
+                                </tr>
+                                <tr id="ligneTVA">
+                                    <td colspan="3" class="text-right"><strong>TVA (<span id="tauxTVA">{{ tva }}</span>%)</strong></td>
+                                    <td><strong id="totalTVA">0.00</strong> €</td>
+                                    <td></td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td colspan="3" class="text-right"><strong id="labelTotal">Total TTC</strong></td>
+                                    <td><strong id="totalTTC">0.00</strong> €</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2><i class="fas fa-comment-dots"></i> Notes et Réclamations</h2>
+                    
+                    <div class="form-group">
+                        <label for="notes">
+                            <i class="fas fa-sticky-note"></i> Notes générales
+                        </label>
+                        <textarea id="notes" name="notes" rows="3" class="form-control"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reclamation">
+                            <i class="fas fa-exclamation-circle"></i> Réclamation / Observations
+                        </label>
+                        <textarea id="reclamation" name="reclamation" rows="4" class="form-control"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="resetForm()">
+                        <i class="fas fa-redo"></i> Réinitialiser
+                    </button>
+                    <button type="submit" class="btn-primary" id="btnGenerer">
+                        <i class="fas fa-file-pdf"></i> Générer la facture
+                    </button>
+                </div>
+            </form>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+    <script>
+        let articleCount = 0;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            ajouterArticle();
+            calculerTotaux();
+            
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const formatDate = (date) => date.toISOString().split('T')[0];
+            
+            document.getElementById('date_debut').value = formatDate(firstDay);
+            document.getElementById('date_fin').value = formatDate(lastDay);
+        });
+        
+        function afficherFormulaireNouveauClient() {
+            document.getElementById('nouveauClientForm').style.display = 'block';
+            document.getElementById('nouveau_client_nom').focus();
+        }
+        
+        function annulerNouveauClient() {
+            document.getElementById('nouveauClientForm').style.display = 'none';
+            document.getElementById('nouveau_client_nom').value = '';
+            document.getElementById('nouveau_client_ville').value = '';
+            document.getElementById('nouveau_client_adresse').value = '';
+            document.getElementById('nouveau_client_email').value = '';
+            document.getElementById('nouveau_client_telephone').value = '';
+            document.getElementById('nouveau_client_siret').value = '';
+        }
+        
+        async function enregistrerNouveauClient() {
+            const nom = document.getElementById('nouveau_client_nom').value.trim();
+            if (!nom) {
+                alert('⚠️ Le nom du client est obligatoire');
+                return;
+            }
+            
+            const clientData = {
+                nom: nom,
+                ville: document.getElementById('nouveau_client_ville').value.trim(),
+                adresse: document.getElementById('nouveau_client_adresse').value.trim(),
+                email: document.getElementById('nouveau_client_email').value.trim(),
+                telephone: document.getElementById('nouveau_client_telephone').value.trim(),
+                siret: document.getElementById('nouveau_client_siret').value.trim()
+            };
+            
+            try {
+                const response = await fetch('/api/clients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(clientData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const select = document.getElementById('client_id');
+                    const option = document.createElement('option');
+                    option.value = result.client.id;
+                    option.text = `${result.client.nom} - ${result.client.ville || ''}`;
+                    option.selected = true;
+                    select.add(option);
+                    
+                    annulerNouveauClient();
+                    alert('✅ Client ajouté avec succès !');
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        function ajouterArticle() {
+            articleCount++;
+            const tbody = document.getElementById('articlesBody');
+            const row = document.createElement('tr');
+            row.id = 'article-' + articleCount;
+            row.innerHTML = `
+                <td>
+                    <input type="text" name="details[${articleCount}][description]"
+                           class="form-control" placeholder="Description du service"
+                           onchange="calculerTotalArticle(${articleCount})">
+                </td>
+                <td>
+                    <input type="number" name="details[${articleCount}][quantite]"
+                           value="1" min="0" step="0.01" class="form-control"
+                           onchange="calculerTotalArticle(${articleCount})">
+                </td>
+                <td>
+                    <input type="number" name="details[${articleCount}][prix_ht]"
+                           value="0" min="0" step="0.01" class="form-control"
+                           onchange="calculerTotalArticle(${articleCount})">
+                </td>
+                <td>
+                    <input type="text" name="details[${articleCount}][total]"
+                           readonly class="form-control total-cell" value="0.00">
+                </td>
+                <td>
+                    <button type="button" class="btn-remove" onclick="supprimerArticle(${articleCount})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        }
+        
+        function supprimerArticle(id) {
+            document.getElementById('article-' + id)?.remove();
+            calculerTotaux();
+        }
+        
+        function calculerTotalArticle(id) {
+            const row = document.getElementById('article-' + id);
+            if (!row) return;
+            
+            const quantite = parseFloat(row.querySelector(`input[name="details[${id}][quantite]"]`).value) || 0;
+            const prixHT = parseFloat(row.querySelector(`input[name="details[${id}][prix_ht]"]`).value) || 0;
+            const total = quantite * prixHT;
+            
+            row.querySelector(`input[name="details[${id}][total]"]`).value = total.toFixed(2);
+            calculerTotaux();
+        }
+        
+        function calculerTotaux() {
+            let totalHT = 0;
+            document.querySelectorAll('#articlesBody tr').forEach(row => {
+                const totalInput = row.querySelector('input[type="text"][name*="[total]"]');
+                if (totalInput) totalHT += parseFloat(totalInput.value) || 0;
+            });
+            
+            const appliquerTVA = document.getElementById('appliquer_tva').checked;
+            const tauxTVA = {{ tva }};
+            
+            let totalTVA = 0;
+            let totalFinal = totalHT;
+            
+            if (appliquerTVA) {
+                totalTVA = totalHT * (tauxTVA / 100);
+                totalFinal = totalHT + totalTVA;
+                document.getElementById('ligneTVA').style.display = 'table-row';
+                document.getElementById('labelTotal').textContent = 'Total TTC';
+            } else {
+                document.getElementById('ligneTVA').style.display = 'none';
+                document.getElementById('labelTotal').textContent = 'Total HT';
+            }
+            
+            document.getElementById('totalHT').textContent = totalHT.toFixed(2);
+            document.getElementById('totalTVA').textContent = totalTVA.toFixed(2);
+            document.getElementById('totalTTC').textContent = totalFinal.toFixed(2);
+        }
+        
+        function resetForm() {
+            if (confirm('Voulez-vous vraiment réinitialiser le formulaire ?')) {
+                document.getElementById('articlesBody').innerHTML = '';
+                document.getElementById('notes').value = '';
+                document.getElementById('reclamation').value = '';
+                ajouterArticle();
+                calculerTotaux();
+            }
+        }
+        
+        document.getElementById('factureForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const clientId = document.getElementById('client_id').value;
+            if (!clientId) {
+                alert('⚠️ Veuillez sélectionner un client');
+                return;
+            }
+            
+            let hasValidArticle = false;
+            document.querySelectorAll('#articlesBody input[name*="[description]"]').forEach(input => {
+                if (input.value.trim()) hasValidArticle = true;
+            });
+            
+            if (!hasValidArticle) {
+                alert('⚠️ Veuillez ajouter au moins un article');
+                return;
+            }
+            
+            const btnGenerer = document.getElementById('btnGenerer');
+            btnGenerer.disabled = true;
+            btnGenerer.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
+            
+            this.submit();
+        });
+    </script>
+
+    <style>
+        .tva-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498DB;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2ecc71;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .tva-label {
+            font-weight: 600;
+            color: #2C3E50;
+            cursor: pointer;
+            margin: 0;
+            font-size: 16px;
+        }
+        
+        .help-text {
+            display: block;
+            margin-top: 8px;
+            color: #7f8c8d;
+            font-size: 13px;
+            font-style: italic;
+        }
+        
+        .btn-add-inline {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+            transition: all 0.3s;
+        }
+        
+        .btn-add-inline:hover {
+            background: #27ae60;
+        }
+        
+        .form-actions-inline {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+    </style>
+</body>
+</html>

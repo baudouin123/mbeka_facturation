@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saisie Journalière - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-clipboard-list"></i> Saisie Journalière</h1>
+                    <p class="subtitle">Enregistrement des livraisons quotidiennes</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('saisie_journaliere') }}" class="nav-link active">
+                <i class="fas fa-clipboard-list"></i> Saisie Journalière
+            </a>
+            <a href="{{ url_for('nouvelle_facture_employe') }}" class="nav-link">
+                <i class="fas fa-file-invoice"></i> Bulletin Employé
+            </a>
+            <a href="{{ url_for('employes') }}" class="nav-link">
+                <i class="fas fa-users"></i> Employés
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <!-- Formulaire de saisie -->
+            <div class="form-section">
+                <h2><i class="fas fa-plus-circle"></i> Nouvelle Livraison</h2>
+                
+                <form id="formLivraison">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="date_livraison">Date *</label>
+                            <input type="date" id="date_livraison" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="employe_id">Employé *</label>
+                            <select id="employe_id" class="form-control" required>
+                                <option value="">— Sélectionner —</option>
+                                {% for employe in employes %}
+                                <option value="{{ employe.id }}">{{ employe.nom_complet() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nombre_journaux">Nombre de journaux *</label>
+                            <input type="number" id="nombre_journaux" min="0" value="0" 
+                                   class="form-control" required onchange="calculerMontant()">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="prix_unitaire">Prix par journal (€)</label>
+                            <input type="number" id="prix_unitaire" min="0" step="0.01" value="0.50" 
+                                   class="form-control" onchange="calculerMontant()">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="montant_jour">Montant du jour (€) *</label>
+                            <input type="number" id="montant_jour" min="0" step="0.01" value="0" 
+                                   class="form-control" required>
+                            <small class="help-text">Calculé automatiquement ou modifiable manuellement</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="notes">Notes</label>
+                            <input type="text" id="notes" class="form-control" 
+                                   placeholder="Observations...">
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="resetFormulaire()">
+                            <i class="fas fa-redo"></i> Réinitialiser
+                        </button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Liste des livraisons du jour -->
+            <div class="form-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-list"></i> Livraisons d'aujourd'hui</h2>
+                    <button class="btn-refresh" onclick="chargerLivraisonsJour()">
+                        <i class="fas fa-sync-alt"></i> Actualiser
+                    </button>
+                </div>
+                
+                <div id="livraisonsJour" class="table-responsive">
+                    <!-- Chargé dynamiquement -->
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            // Date d'aujourd'hui par défaut
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date_livraison').value = today;
+            
+            chargerLivraisonsJour();
+        });
+        
+        // Calculer le montant automatiquement
+        function calculerMontant() {
+            const nbJournaux = parseFloat(document.getElementById('nombre_journaux').value) || 0;
+            const prixUnit = parseFloat(document.getElementById('prix_unitaire').value) || 0;
+            const montant = nbJournaux * prixUnit;
+            
+            document.getElementById('montant_jour').value = montant.toFixed(2);
+        }
+        
+        // Enregistrer une livraison
+        document.getElementById('formLivraison').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const data = {
+                date_livraison: document.getElementById('date_livraison').value,
+                employe_id: document.getElementById('employe_id').value,
+                nombre_journaux: parseInt(document.getElementById('nombre_journaux').value),
+                montant_jour: parseFloat(document.getElementById('montant_jour').value),
+                notes: document.getElementById('notes').value
+            };
+            
+            try {
+                const response = await fetch('/api/livraisons', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ ' + result.message);
+                    resetFormulaire();
+                    chargerLivraisonsJour();
+                } else {
+                    alert('❌ ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+            }
+        });
+        
+        // Réinitialiser le formulaire
+        function resetFormulaire() {
+            document.getElementById('formLivraison').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date_livraison').value = today;
+            document.getElementById('prix_unitaire').value = '0.50';
+            document.getElementById('montant_jour').value = '0';
+        }
+        
+        // Charger les livraisons du jour
+        async function chargerLivraisonsJour() {
+            const dateJour = document.getElementById('date_livraison').value;
+            
+            try {
+                const response = await fetch('/api/livraisons');
+                const livraisons = await response.json();
+                
+                // Filtrer par date du jour
+                const livraisonsJour = livraisons.filter(l => {
+                    const dateLivr = l.date_livraison.split('/').reverse().join('-');
+                    return dateLivr === dateJour;
+                });
+                
+                afficherLivraisonsJour(livraisonsJour);
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+        
+        // Afficher les livraisons
+        function afficherLivraisonsJour(livraisons) {
+            const container = document.getElementById('livraisonsJour');
+            
+            if (livraisons.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox fa-3x"></i>
+                        <p>Aucune livraison enregistrée pour cette date</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Employé</th>
+                            <th>Journaux</th>
+                            <th>Montant</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            livraisons.forEach(l => {
+                html += `
+                    <tr id="livraison-${l.id}">
+                        <td><strong>${l.employe_nom}</strong></td>
+                        <td>${l.nombre_journaux}</td>
+                        <td>${l.montant_jour.toFixed(2)} €</td>
+                        <td>${l.notes || '-'}</td>
+                        <td>
+                            <button class="btn-action btn-danger" onclick="supprimerLivraison(${l.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        // Supprimer une livraison
+        async function supprimerLivraison(id) {
+            if (!confirm('Supprimer cette livraison ?')) return;
+            
+            try {
+                const response = await fetch(`/api/livraisons/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    document.getElementById(`livraison-${id}`).remove();
+                    alert('✅ Livraison supprimée');
+                }
+            } catch (error) {
+                alert('❌ Erreur');
+            }
+        }
+    </script>
+
+    <style>
+        .help-text {
+            display: block;
+            margin-top: 5px;
+            color: #7f8c8d;
+            font-size: 13px;
+            font-style: italic;
+        }
+        
+        .btn-danger {
+            color: #e74c3c !important;
+        }
+        
+        .btn-danger:hover {
+            background: #e74c3c !important;
+            color: white !important;
+        }
+    </style>
+</body>
+</html>

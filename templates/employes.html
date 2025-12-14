@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Employés - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-users"></i> Gestion des Employés</h1>
+                    <p class="subtitle">Gérez vos employés et leurs amendes</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('nouvelle_facture_client') }}" class="nav-link">
+                <i class="fas fa-file-invoice-dollar"></i> Facture Client
+            </a>
+            <a href="{{ url_for('nouvelle_facture_employe') }}" class="nav-link">
+                <i class="fas fa-user-tie"></i> Facture Employé
+            </a>
+            <a href="{{ url_for('employes') }}" class="nav-link active">
+                <i class="fas fa-users"></i> Employés
+            </a>
+            <a href="{{ url_for('clients') }}" class="nav-link">
+                <i class="fas fa-building"></i> Clients
+            </a>
+            <a href="{{ url_for('factures') }}" class="nav-link">
+                <i class="fas fa-receipt"></i> Factures
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <!-- En-tête avec bouton d'ajout -->
+            <div class="section-header">
+                <h2><i class="fas fa-list"></i> Liste des employés</h2>
+                <div class="header-actions">
+                    <button class="btn-add" onclick="ouvrirModalEmploye()">
+                        <i class="fas fa-user-plus"></i> Nouvel employé
+                    </button>
+                    <button class="btn-refresh" onclick="chargerEmployes()">
+                        <i class="fas fa-sync-alt"></i> Actualiser
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtres -->
+            <div class="filters-container">
+                <div class="filter-group">
+                    <label for="filter-statut"><i class="fas fa-filter"></i> Statut :</label>
+                    <select id="filter-statut" class="filter-select" onchange="filtrerEmployes()">
+                        <option value="all">Tous les statuts</option>
+                        <option value="actif">Actifs</option>
+                        <option value="inactif">Inactifs</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filter-search"><i class="fas fa-search"></i> Rechercher :</label>
+                    <input type="text" id="filter-search" class="filter-input" 
+                           placeholder="Nom, prénom, matricule..." oninput="filtrerEmployes()">
+                </div>
+            </div>
+
+            <!-- Liste des employés -->
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="data-table" id="employesTable">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom & Prénom</th>
+                                <th>Poste</th>
+                                <th>Taux horaire</th>
+                                <th>Amendes en attente</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employesBody">
+                            <!-- Les employés seront chargés dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="empty-state" id="noEmployesMessage" style="display: none;">
+                    <i class="fas fa-users fa-4x"></i>
+                    <h3>Aucun employé trouvé</h3>
+                    <p>Commencez par ajouter votre premier employé</p>
+                    <button class="btn-primary" onclick="ouvrirModalEmploye()">
+                        <i class="fas fa-user-plus"></i> Ajouter un employé
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistiques -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #3498DB;">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="statTotal">0</h3>
+                        <p>Total employés</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #2ecc71;">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="statActifs">0</h3>
+                        <p>Employés actifs</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #e74c3c;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="statAmendes">0</h3>
+                        <p>Amendes en attente</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #9b59b6;">
+                        <i class="fas fa-euro-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="statMontant">0 €</h3>
+                        <p>Montant amendes</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }} - Gestion des employés</p>
+        </footer>
+    </div>
+
+    <!-- Modal pour ajouter/modifier un employé -->
+    <div id="modalEmploye" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-edit"></i> <span id="modalTitle">Nouvel employé</span></h3>
+                <button class="btn-close" onclick="fermerModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formEmploye">
+                    {{ csrf_token() }}
+                    <input type="hidden" id="employe_id">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nom">Nom *</label>
+                            <input type="text" id="nom" required class="form-control">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="prenom">Prénom *</label>
+                            <input type="text" id="prenom" required class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="matricule">Matricule</label>
+                            <input type="text" id="matricule" class="form-control">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="poste">Poste</label>
+                            <input type="text" id="poste" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taux_horaire">Taux horaire (€)</label>
+                        <input type="number" id="taux_horaire" min="0" step="0.01" 
+                               value="0" class="form-control">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="telephone">Téléphone</label>
+                            <input type="tel" id="telephone" class="form-control">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="date_embauche">Date d'embauche</label>
+                        <input type="date" id="date_embauche" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="actif" checked>
+                            <span>Employé actif</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModal()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="sauvegarderEmploye()">
+                    <i class="fas fa-save"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal pour les amendes d'un employé -->
+    <div id="modalAmendes" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Amendes de <span id="employeNom"></span></h3>
+                <button class="btn-close" onclick="fermerModalAmendes()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="section-header">
+                    <h4>Amendes en attente</h4>
+                    <button class="btn-add" onclick="ajouterAmendeModal()">
+                        <i class="fas fa-plus"></i> Nouvelle amende
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Raison</th>
+                                <th>Montant</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="amendesBody">
+                            <!-- Amendes chargées dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="empty-state-small" id="noAmendesMessage">
+                    <i class="fas fa-check-circle fa-3x"></i>
+                    <p>Aucune amende en attente</p>
+                </div>
+                
+                <!-- Formulaire nouvelle amende -->
+                <div id="formAmende" style="display: none; margin-top: 30px;">
+                    <h4><i class="fas fa-plus-circle"></i> Nouvelle amende</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="amende_raison">Raison *</label>
+                            <input type="text" id="amende_raison" class="form-control" 
+                                   placeholder="Ex: Retard, erreur, matériel endommagé...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="amende_montant">Montant (€) *</label>
+                            <input type="number" id="amende_montant" min="0" step="0.01" 
+                                   value="0" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="amende_date">Date *</label>
+                        <input type="date" id="amende_date" class="form-control">
+                    </div>
+                    
+                    <div class="form-actions-inline">
+                        <button class="btn-secondary" onclick="annulerAmendeModal()">
+                            <i class="fas fa-times"></i> Annuler
+                        </button>
+                        <button class="btn-primary" onclick="sauvegarderAmendeModal()">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let employesData = [];
+        let employeActuel = null;
+        
+        // Charger les employés au démarrage
+        document.addEventListener('DOMContentLoaded', function() {
+            chargerEmployes();
+            
+            // Date par défaut pour nouvelle amende
+            const today = new Date();
+            document.getElementById('amende_date').value = today.toISOString().split('T')[0];
+        });
+        
+        // Charger la liste des employés
+        async function chargerEmployes() {
+            try {
+                const response = await fetch('/api/employes');
+                employesData = await response.json();
+                
+                afficherEmployes(employesData);
+                calculerStatistiques();
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors du chargement des employés');
+            }
+        }
+        
+        // Afficher les employés dans le tableau
+        function afficherEmployes(employes) {
+            const tbody = document.getElementById('employesBody');
+            const noEmployesMessage = document.getElementById('noEmployesMessage');
+            
+            tbody.innerHTML = '';
+            
+            if (employes.length === 0) {
+                tbody.style.display = 'none';
+                noEmployesMessage.style.display = 'block';
+                return;
+            }
+            
+            tbody.style.display = 'table-row-group';
+            noEmployesMessage.style.display = 'none';
+            
+            employes.forEach(employe => {
+                const tr = document.createElement('tr');
+                
+                // Charger les amendes pour cet employé
+                let amendesCount = 0;
+                let amendesTotal = 0;
+                
+                // Dans une vraie application, vous auriez une API pour récupérer les amendes
+                // Ici, on utilise des données simulées ou une API séparée
+                
+                tr.innerHTML = `
+                    <td>${employe.matricule || 'N/A'}</td>
+                    <td>
+                        <strong>${employe.nom} ${employe.prenom}</strong>
+                        ${employe.email ? `<br><small>${employe.email}</small>` : ''}
+                    </td>
+                    <td>${employe.poste || 'Non spécifié'}</td>
+                    <td>${employe.taux_horaire} €/h</td>
+                    <td>
+                        <span class="badge ${amendesCount > 0 ? 'badge-warning' : 'badge-success'}">
+                            ${amendesCount} amende${amendesCount !== 1 ? 's' : ''}
+                        </span>
+                        ${amendesTotal > 0 ? `<br><small>Total: ${amendesTotal} €</small>` : ''}
+                    </td>
+                    <td>
+                        <span class="badge ${employe.actif ? 'badge-success' : 'badge-danger'}">
+                            ${employe.actif ? 'Actif' : 'Inactif'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action" title="Voir les amendes" onclick="voirAmendes(${employe.id}, '${employe.nom} ${employe.prenom}')">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </button>
+                            <button class="btn-action" title="Éditer" onclick="editerEmploye(${employe.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-action" title="Supprimer" onclick="supprimerEmploye(${employe.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // Filtrer les employés
+        function filtrerEmployes() {
+            const statut = document.getElementById('filter-statut').value;
+            const search = document.getElementById('filter-search').value.toLowerCase();
+            
+            let employesFiltres = employesData;
+            
+            // Filtrer par statut
+            if (statut !== 'all') {
+                employesFiltres = employesFiltres.filter(e => 
+                    statut === 'actif' ? e.actif : !e.actif
+                );
+            }
+            
+            // Filtrer par recherche
+            if (search) {
+                employesFiltres = employesFiltres.filter(e => 
+                    e.nom.toLowerCase().includes(search) ||
+                    e.prenom.toLowerCase().includes(search) ||
+                    (e.matricule && e.matricule.toLowerCase().includes(search)) ||
+                    (e.poste && e.poste.toLowerCase().includes(search))
+                );
+            }
+            
+            afficherEmployes(employesFiltres);
+        }
+        
+        // Calculer les statistiques
+        async function calculerStatistiques() {
+            // Ces statistiques devraient venir de l'API dans une vraie application
+            // Pour l'exemple, on utilise les données chargées
+            
+            const total = employesData.length;
+            const actifs = employesData.filter(e => e.actif).length;
+            
+            // Compter les amendes (dans une vraie app, vous feriez un appel API)
+            let amendesCount = 0;
+            let amendesTotal = 0;
+            
+            // Simuler le comptage des amendes
+            for (const employe of employesData) {
+                try {
+                    const response = await fetch(`/api/employes/${employe.id}/amendes`);
+                    if (response.ok) {
+                        const amendes = await response.json();
+                        amendesCount += amendes.length;
+                        amendesTotal += amendes.reduce((sum, a) => sum + a.montant, 0);
+                    }
+                } catch (error) {
+                    console.error('Erreur lors du chargement des amendes:', error);
+                }
+            }
+            
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statActifs').textContent = actifs;
+            document.getElementById('statAmendes').textContent = amendesCount;
+            document.getElementById('statMontant').textContent = amendesTotal.toFixed(2) + ' €';
+        }
+        
+        // Gestion de la modal employé
+        function ouvrirModalEmploye(employe = null) {
+            const modal = document.getElementById('modalEmploye');
+            const form = document.getElementById('formEmploye');
+            
+            if (employe) {
+                document.getElementById('modalTitle').textContent = 'Modifier l\'employé';
+                document.getElementById('employe_id').value = employe.id;
+                document.getElementById('nom').value = employe.nom;
+                document.getElementById('prenom').value = employe.prenom;
+                document.getElementById('matricule').value = employe.matricule || '';
+                document.getElementById('poste').value = employe.poste || '';
+                document.getElementById('taux_horaire').value = employe.taux_horaire || '0';
+                document.getElementById('telephone').value = employe.telephone || '';
+                document.getElementById('email').value = employe.email || '';
+                document.getElementById('date_embauche').value = employe.date_embauche || '';
+                document.getElementById('actif').checked = employe.actif;
+            } else {
+                document.getElementById('modalTitle').textContent = 'Nouvel employé';
+                form.reset();
+                document.getElementById('employe_id').value = '';
+                document.getElementById('taux_horaire').value = '0';
+                document.getElementById('actif').checked = true;
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function fermerModal() {
+            document.getElementById('modalEmploye').style.display = 'none';
+            document.getElementById('formEmploye').reset();
+        }
+        
+        // Sauvegarder un employé
+        async function sauvegarderEmploye() {
+            const form = document.getElementById('formEmploye');
+            const id = document.getElementById('employe_id').value;
+            
+            // Validation
+            const nom = document.getElementById('nom').value.trim();
+            const prenom = document.getElementById('prenom').value.trim();
+            
+            if (!nom || !prenom) {
+                alert('Le nom et le prénom sont obligatoires');
+                return;
+            }
+            
+            const data = {
+                nom: nom,
+                prenom: prenom,
+                matricule: document.getElementById('matricule').value.trim(),
+                poste: document.getElementById('poste').value.trim(),
+                taux_horaire: parseFloat(document.getElementById('taux_horaire').value) || 0,
+                telephone: document.getElementById('telephone').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                date_embauche: document.getElementById('date_embauche').value,
+                actif: document.getElementById('actif').checked
+            };
+            
+            try {
+                let response;
+                
+                if (id) {
+                    // Mise à jour
+                    response = await fetch(`/api/employes/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Création
+                    response = await fetch('/api/employes', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                }
+                
+                if (response.ok) {
+                    fermerModal();
+                    chargerEmployes();
+                    alert(id ? 'Employé mis à jour avec succès' : 'Employé créé avec succès');
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                alert('Erreur de connexion: ' + error.message);
+            }
+        }
+        
+        // Éditer un employé
+        function editerEmploye(id) {
+            const employe = employesData.find(e => e.id == id);
+            if (employe) {
+                ouvrirModalEmploye(employe);
+            }
+        }
+        
+        // Supprimer un employé - VERSION AMÉLIORÉE AVEC AVERTISSEMENT DÉTAILLÉ
+        async function supprimerEmploye(id) {
+            try {
+                // 1. Récupérer d'abord les informations détaillées
+                const response = await fetch(`/api/employes/${id}/infos-suppression`);
+                const infos = await response.json();
+                
+                // 2. Construire le message d'avertissement détaillé
+                let message = `⚠️ ATTENTION - SUPPRESSION DÉFINITIVE ⚠️\n\n`;
+                message += `Vous êtes sur le point de supprimer :\n`;
+                message += `👤 ${infos.employe.nom_complet}\n`;
+                message += `🆔 Matricule : ${infos.employe.matricule || 'N/A'}\n\n`;
+                
+                if (infos.has_data) {
+                    message += `⚠️ CET EMPLOYÉ A DES DONNÉES ASSOCIÉES QUI SERONT AUSSI SUPPRIMÉES :\n\n`;
+                    
+                    if (infos.nb_factures > 0) {
+                        message += `📄 ${infos.nb_factures} facture(s) - Total : ${infos.total_factures.toFixed(2)} €\n`;
+                    }
+                    
+                    if (infos.nb_amendes > 0) {
+                        message += `⚠️ ${infos.nb_amendes} amende(s)\n`;
+                    }
+                    
+                    if (infos.nb_livraisons > 0) {
+                        message += `📦 ${infos.nb_livraisons} livraison(s)\n`;
+                    }
+                    
+                    message += `\n🗑️ TOUTES CES DONNÉES SERONT SUPPRIMÉES DÉFINITIVEMENT !\n`;
+                    message += `Cette action est IRRÉVERSIBLE.\n\n`;
+                } else {
+                    message += `ℹ️ Cet employé n'a pas de données associées.\n\n`;
+                }
+                
+                message += `Êtes-vous absolument sûr de vouloir continuer ?`;
+                
+                // 3. Demander confirmation avec le message détaillé
+                if (!confirm(message)) {
+                    return; // Annulation
+                }
+                
+                // 4. Demander une DOUBLE confirmation si l'employé a des données
+                if (infos.has_data) {
+                    const doubleConfirm = confirm(
+                        `⚠️ DERNIÈRE CONFIRMATION ⚠️\n\n` +
+                        `Cette suppression va effacer ${infos.nb_factures} facture(s), ` +
+                        `${infos.nb_amendes} amende(s) et ${infos.nb_livraisons} livraison(s).\n\n` +
+                        `Cliquez sur OK pour CONFIRMER LA SUPPRESSION DÉFINITIVE.`
+                    );
+                    
+                    if (!doubleConfirm) {
+                        return; // Annulation
+                    }
+                }
+                
+                // 5. Procéder à la suppression
+                const deleteResponse = await fetch(`/api/employes/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await deleteResponse.json();
+                
+                if (deleteResponse.ok) {
+                    alert('✅ ' + result.message);
+                    chargerEmployes(); // Recharger la liste
+                    calculerStatistiques(); // Recalculer les stats
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur lors de la suppression');
+            }
+        }
+        
+        // Gestion de la modal amendes
+        async function voirAmendes(employeId, employeNom) {
+            employeActuel = employeId;
+            document.getElementById('employeNom').textContent = employeNom;
+            
+            const modal = document.getElementById('modalAmendes');
+            modal.style.display = 'block';
+            
+            await chargerAmendesEmploye(employeId);
+        }
+        
+        function fermerModalAmendes() {
+            document.getElementById('modalAmendes').style.display = 'none';
+            document.getElementById('formAmende').style.display = 'none';
+            employeActuel = null;
+        }
+        
+        async function chargerAmendesEmploye(employeId) {
+            try {
+                const response = await fetch(`/api/employes/${employeId}/amendes`);
+                const amendes = await response.json();
+                
+                const tbody = document.getElementById('amendesBody');
+                const noAmendesMessage = document.getElementById('noAmendesMessage');
+                
+                tbody.innerHTML = '';
+                
+                if (amendes.length === 0) {
+                    noAmendesMessage.style.display = 'block';
+                    return;
+                }
+                
+                noAmendesMessage.style.display = 'none';
+                
+                amendes.forEach(amende => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${amende.date_amende}</td>
+                        <td>${amende.raison}</td>
+                        <td class="text-danger">-${amende.montant} €</td>
+                        <td>
+                            <span class="badge ${amende.statut === 'en_attente' ? 'badge-warning' : 'badge-success'}">
+                                ${amende.statut === 'en_attente' ? 'En attente' : 'Appliquée'}
+                            </span>
+                        </td>
+                        <td>
+                            ${amende.statut === 'en_attente' ? `
+                            <button class="btn-action" onclick="supprimerAmendeModal(${amende.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            ` : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+        
+        function ajouterAmendeModal() {
+            document.getElementById('formAmende').style.display = 'block';
+        }
+        
+        function annulerAmendeModal() {
+            document.getElementById('formAmende').style.display = 'none';
+            document.getElementById('amende_raison').value = '';
+            document.getElementById('amende_montant').value = '0';
+        }
+        
+        async function sauvegarderAmendeModal() {
+            if (!employeActuel) return;
+            
+            const raison = document.getElementById('amende_raison').value.trim();
+            const montant = parseFloat(document.getElementById('amende_montant').value);
+            const date = document.getElementById('amende_date').value;
+            
+            if (!raison) {
+                alert('Veuillez saisir une raison pour l\'amende');
+                return;
+            }
+            
+            if (montant <= 0) {
+                alert('Le montant de l\'amende doit être supérieur à 0');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/amendes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employe_id: employeActuel,
+                        montant: montant,
+                        raison: raison,
+                        date_amende: date
+                    })
+                });
+                
+                if (response.ok) {
+                    annulerAmendeModal();
+                    chargerAmendesEmploye(employeActuel);
+                    calculerStatistiques();
+                    alert('Amende enregistrée avec succès');
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                alert('Erreur de connexion');
+            }
+        }
+        
+        async function supprimerAmendeModal(amendeId) {
+            if (!confirm('Voulez-vous vraiment supprimer cette amende ?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/amendes/${amendeId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    chargerAmendesEmploye(employeActuel);
+                    calculerStatistiques();
+                    alert('Amende supprimée avec succès');
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                alert('Erreur de connexion');
+            }
+        }
+        
+        // Fermer les modales en cliquant en dehors
+        window.onclick = function(event) {
+            const modalEmploye = document.getElementById('modalEmploye');
+            const modalAmendes = document.getElementById('modalAmendes');
+            
+            if (event.target == modalEmploye) {
+                fermerModal();
+            }
+            if (event.target == modalAmendes) {
+                fermerModalAmendes();
+            }
+        };
+    </script>
+
+    <style>
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
+        
+        .logo-large {
+            height: 80px;
+            width: auto;
+            border-radius: 10px;
+            border: 3px solid white;
+        }
+        
+        .logo-text h1 {
+            margin: 0;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .subtitle {
+            color: #BDC3C7;
+            margin-top: 5px;
+            font-size: 16px;
+        }
+        
+        .btn-back {
+            background: #3498DB;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-back:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .main-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-link {
+            flex: 1;
+            min-width: 150px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #2C3E50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .nav-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .nav-link.active {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .section-header h2 {
+            color: #2C3E50;
+            margin: 0;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn-add {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-add:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.3);
+        }
+        
+        .btn-refresh {
+            background: #3498DB;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-refresh:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .filters-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+        }
+        
+        @media (max-width: 768px) {
+            .filters-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .filter-group label {
+            font-weight: 600;
+            color: #2C3E50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .filter-select, .filter-input {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .filter-select:focus, .filter-input:focus {
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+            outline: none;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 40px;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th {
+            background: #f8f9fa;
+            padding: 18px;
+            text-align: left;
+            color: #2C3E50;
+            font-weight: 600;
+            font-size: 16px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .data-table td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 15px;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+        
+        .badge-warning {
+            background: rgba(241, 196, 15, 0.1);
+            color: #f39c12;
+            border: 1px solid rgba(241, 196, 15, 0.3);
+        }
+        
+        .badge-danger {
+            background: rgba(231, 76, 60, 0.1);
+            color: #c0392b;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-action {
+            background: #f8f9fa;
+            color: #3498DB;
+            border: 2px solid #e0e0e0;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-action:hover {
+            background: #3498DB;
+            color: white;
+            border-color: #3498DB;
+            transform: translateY(-2px);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #7f8c8d;
+        }
+        
+        .empty-state i {
+            color: #BDC3C7;
+            margin-bottom: 30px;
+        }
+        
+        .empty-state h3 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        
+        .empty-state p {
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+        }
+        
+        .stat-content h3 {
+            font-size: 36px;
+            margin: 0;
+            color: #2C3E50;
+            font-weight: 700;
+        }
+        
+        .stat-content p {
+            color: #7f8c8d;
+            font-size: 15px;
+            margin: 5px 0 0 0;
+        }
+        
+        /* Styles des modales */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.3s;
+        }
+        
+        .modal-content.large {
+            max-width: 800px;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            color: #2C3E50;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .btn-close:hover {
+            color: #e74c3c;
+        }
+        
+        .modal-body {
+            padding: 30px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            padding: 20px 30px;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2C3E50;
+            font-weight: 600;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus {
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+            outline: none;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        
+        .checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .empty-state-small {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7f8c8d;
+        }
+        
+        .empty-state-small i {
+            margin-bottom: 15px;
+            color: #2ecc71;
+        }
+        
+        .form-actions-inline {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+        
+        .text-danger {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 25px;
+            color: #7f8c8d;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .logo-section {
+                flex-direction: column;
+            }
+            
+            .main-nav {
+                flex-direction: column;
+            }
+            
+            .section-header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 2% auto;
+            }
+            
+            .modal-footer {
+                flex-direction: column;
+            }
+            
+            .btn-secondary, .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</body>
+</html>

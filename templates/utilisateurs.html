@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion Utilisateurs - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-users-cog"></i> Gestion des Utilisateurs</h1>
+                    <p class="subtitle">Gérer les accès et permissions</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="user-info">
+                    <i class="fas fa-user-circle"></i> {{ current_user.prenom or current_user.username }} ({{ current_user.role }})
+                </span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> Déconnexion
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('dashboard') }}" class="nav-link">
+                <i class="fas fa-chart-line"></i> Dashboard
+            </a>
+            <a href="{{ url_for('factures') }}" class="nav-link">
+                <i class="fas fa-receipt"></i> Factures
+            </a>
+            <a href="{{ url_for('utilisateurs') }}" class="nav-link active">
+                <i class="fas fa-users-cog"></i> Utilisateurs
+            </a>
+        </nav>
+
+        <main class="main-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-users"></i> Liste des Utilisateurs</h2>
+                    <button class="btn-add" onclick="afficherModalCreer()">
+                        <i class="fas fa-plus"></i> Nouvel utilisateur
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Nom complet</th>
+                                <th>Email</th>
+                                <th>Rôle</th>
+                                <th>Statut</th>
+                                <th>Dernière connexion</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in utilisateurs %}
+                            <tr>
+                                <td><strong>{{ user.username }}</strong></td>
+                                <td>{{ user.prenom }} {{ user.nom }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    {% if user.role == 'admin' %}
+                                        <span class="badge badge-danger">👑 Admin</span>
+                                    {% elif user.role == 'comptable' %}
+                                        <span class="badge badge-warning">💼 Comptable</span>
+                                    {% else %}
+                                        <span class="badge badge-info">👤 Employé</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.actif %}
+                                        <span class="badge badge-success">✅ Actif</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">❌ Inactif</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.derniere_connexion.strftime('%d/%m/%Y %H:%M') if user.derniere_connexion else 'Jamais' }}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action" title="Modifier" onclick="modifierUtilisateur({{ user.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-action btn-warning" title="Générer lien réinitialisation" onclick="genererLienReset({{ user.id }}, '{{ user.username }}')">
+                                            <i class="fas fa-key"></i>
+                                        </button>
+                                        {% if user.id != current_user.id %}
+                                        <button class="btn-action btn-danger" title="Supprimer" onclick="supprimerUtilisateur({{ user.id }}, '{{ user.username }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+
+    <!-- Modal créer utilisateur -->
+    <div id="modalCreer" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> Nouvel utilisateur</h3>
+                <button class="btn-close" onclick="fermerModalCreer()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-username">Nom d'utilisateur *</label>
+                    <input type="text" id="new-username" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new-email">Email *</label>
+                    <input type="email" id="new-email" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new-telephone">Téléphone (pour SMS)</label>
+                    <input type="tel" id="new-telephone" class="form-control" placeholder="+243 XXX XXX XXX">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="new-nom">Nom</label>
+                        <input type="text" id="new-nom" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new-prenom">Prénom</label>
+                        <input type="text" id="new-prenom" class="form-control">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new-role">Rôle *</label>
+                    <select id="new-role" class="form-control">
+                        <option value="employe">👤 Employé</option>
+                        <option value="comptable">💼 Comptable</option>
+                        <option value="admin">👑 Administrateur</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new-password">Mot de passe *</label>
+                    <input type="password" id="new-password" class="form-control" required>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalCreer()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="creerUtilisateur()">
+                    <i class="fas fa-save"></i> Créer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal modifier utilisateur -->
+    <div id="modalModifier" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-edit"></i> Modifier utilisateur</h3>
+                <button class="btn-close" onclick="fermerModalModifier()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <input type="hidden" id="edit-user-id">
+                
+                <div class="form-group">
+                    <label for="edit-username">Nom d'utilisateur</label>
+                    <input type="text" id="edit-username" class="form-control" disabled>
+                    <small>Le nom d'utilisateur ne peut pas être modifié</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-email">Email *</label>
+                    <input type="email" id="edit-email" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-telephone">Téléphone (pour SMS)</label>
+                    <input type="tel" id="edit-telephone" class="form-control" placeholder="+243 XXX XXX XXX">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-nom">Nom</label>
+                        <input type="text" id="edit-nom" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-prenom">Prénom</label>
+                        <input type="text" id="edit-prenom" class="form-control">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-role">Rôle *</label>
+                    <select id="edit-role" class="form-control">
+                        <option value="employe">👤 Employé</option>
+                        <option value="comptable">💼 Comptable</option>
+                        <option value="admin">👑 Administrateur</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="edit-actif" checked> 
+                        Compte actif
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-password">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
+                    <input type="password" id="edit-password" class="form-control" placeholder="Laisser vide si pas de changement">
+                </div>
+                
+                <hr style="margin: 30px 0;">
+                
+                <!-- Section Permissions Personnalisées -->
+                <div class="permissions-section">
+                    <h4 style="margin-bottom: 20px;">
+                        <i class="fas fa-key"></i> Permissions personnalisées
+                    </h4>
+                    <p style="color: #7f8c8d; margin-bottom: 20px;">
+                        <i class="fas fa-info-circle"></i> Cochez les pages accessibles pour cet utilisateur. Les administrateurs ont toujours accès à tout.
+                    </p>
+                    
+                    <div id="permissions-container" class="permissions-grid">
+                        <!-- Les checkboxes seront générées dynamiquement ici -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalModifier()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="sauvegarderModification()">
+                    <i class="fas fa-save"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal lien de réinitialisation -->
+    <div id="modalReset" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-key"></i> Lien de réinitialisation de mot de passe</h3>
+                <button class="btn-close" onclick="fermerModalReset()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="reset-info"></div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalReset()">
+                    <i class="fas fa-times"></i> Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function afficherModalCreer() {
+            document.getElementById('modalCreer').style.display = 'block';
+        }
+        
+        function fermerModalCreer() {
+            document.getElementById('modalCreer').style.display = 'none';
+            // Réinitialiser le formulaire
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-email').value = '';
+            document.getElementById('new-nom').value = '';
+            document.getElementById('new-prenom').value = '';
+            document.getElementById('new-role').value = 'employe';
+            document.getElementById('new-password').value = '';
+        }
+        
+        async function creerUtilisateur() {
+            const data = {
+                username: document.getElementById('new-username').value,
+                email: document.getElementById('new-email').value,
+                telephone: document.getElementById('new-telephone').value,
+                nom: document.getElementById('new-nom').value,
+                prenom: document.getElementById('new-prenom').value,
+                role: document.getElementById('new-role').value,
+                password: document.getElementById('new-password').value
+            };
+            
+            if (!data.username || !data.email || !data.password) {
+                alert('⚠️ Veuillez remplir tous les champs obligatoires');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/utilisateurs/creer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ ' + result.message);
+                    location.reload();
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        async function modifierUtilisateur(userId) {
+            try {
+                // Récupérer les données de l'utilisateur
+                const response = await fetch('/api/utilisateurs');
+                const users = await response.json();
+                const user = users.find(u => u.id === userId);
+                
+                if (!user) {
+                    alert('❌ Utilisateur introuvable');
+                    return;
+                }
+                
+                // Remplir le formulaire
+                document.getElementById('edit-user-id').value = user.id;
+                document.getElementById('edit-username').value = user.username;
+                document.getElementById('edit-email').value = user.email;
+                document.getElementById('edit-telephone').value = user.telephone || '';
+                document.getElementById('edit-nom').value = user.nom || '';
+                document.getElementById('edit-prenom').value = user.prenom || '';
+                document.getElementById('edit-role').value = user.role;
+                document.getElementById('edit-actif').checked = user.actif;
+                document.getElementById('edit-password').value = '';
+                
+                // Charger les permissions
+                await chargerPermissions(userId, user.role);
+                
+                // Afficher le modal
+                document.getElementById('modalModifier').style.display = 'block';
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de chargement');
+            }
+        }
+        
+        async function chargerPermissions(userId, userRole) {
+            try {
+                const response = await fetch('/api/utilisateurs/' + userId + '/permissions');
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    console.error('Erreur chargement permissions');
+                    return;
+                }
+                
+                const container = document.getElementById('permissions-container');
+                container.innerHTML = '';
+                
+                // Si admin, afficher un message
+                if (userRole === 'admin') {
+                    container.innerHTML = '<p style="color: #27ae60; font-weight: 600;"><i class="fas fa-crown"></i> Les administrateurs ont accès à toutes les pages automatiquement.</p>';
+                    return;
+                }
+                
+                // Icônes par page
+                const pageIcons = {
+                    'dashboard': 'fa-chart-line',
+                    'calendrier': 'fa-calendar',
+                    'factures': 'fa-file-invoice',
+                    'nouvelle_facture_client': 'fa-plus-circle',
+                    'nouvelle_facture_employe': 'fa-user-plus',
+                    'clients': 'fa-building',
+                    'employes': 'fa-users',
+                    'recherche': 'fa-search',
+                    'sauvegardes': 'fa-database',
+                    'historique': 'fa-history',
+                    'utilisateurs': 'fa-user-shield'
+                };
+                
+                // Créer les checkboxes
+                for (const [pageKey, pageLabel] of Object.entries(result.pages_disponibles)) {
+                    const isChecked = result.permissions[pageKey] || false;
+                    const icon = pageIcons[pageKey] || 'fa-file';
+                    
+                    const permDiv = document.createElement('div');
+                    permDiv.className = 'permission-item' + (isChecked ? ' active' : '');
+                    permDiv.onclick = function() {
+                        const checkbox = this.querySelector('input[type="checkbox"]');
+                        checkbox.checked = !checkbox.checked;
+                        this.classList.toggle('active', checkbox.checked);
+                    };
+                    
+                    permDiv.innerHTML = '<input type="checkbox" name="perm-' + pageKey + '" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation(); this.parentElement.classList.toggle(\'active\', this.checked);">' +
+                                       '<label onclick="event.stopPropagation(); event.preventDefault();"><i class="fas ' + icon + ' permission-icon"></i>' + pageLabel + '</label>';
+                    
+                    container.appendChild(permDiv);
+                }
+            } catch (error) {
+                console.error('Erreur chargement permissions:', error);
+            }
+        }
+        
+        function fermerModalModifier() {
+            document.getElementById('modalModifier').style.display = 'none';
+        }
+        
+        async function sauvegarderModification() {
+            const userId = document.getElementById('edit-user-id').value;
+            const password = document.getElementById('edit-password').value;
+            
+            const data = {
+                email: document.getElementById('edit-email').value,
+                telephone: document.getElementById('edit-telephone').value,
+                nom: document.getElementById('edit-nom').value,
+                prenom: document.getElementById('edit-prenom').value,
+                role: document.getElementById('edit-role').value,
+                actif: document.getElementById('edit-actif').checked
+            };
+            
+            // Ajouter le mot de passe seulement s'il est rempli
+            if (password) {
+                if (password.length < 6) {
+                    alert('⚠️ Le mot de passe doit contenir au moins 6 caractères');
+                    return;
+                }
+                data.password = password;
+            }
+            
+            if (!data.email) {
+                alert('⚠️ L\'email est obligatoire');
+                return;
+            }
+            
+            try {
+                // Sauvegarder les données de l'utilisateur
+                const response = await fetch('/api/utilisateurs/' + userId + '/modifier', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Sauvegarder les permissions
+                    await sauvegarderPermissions(userId);
+                    
+                    alert('✅ Utilisateur et permissions mis à jour avec succès');
+                    fermerModalModifier();
+                    location.reload();
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        async function sauvegarderPermissions(userId) {
+            try {
+                // Récupérer toutes les checkboxes de permissions
+                const checkboxes = document.querySelectorAll('#permissions-container input[type="checkbox"]');
+                const permissions = {};
+                
+                checkboxes.forEach(checkbox => {
+                    const pageName = checkbox.name.replace('perm-', '');
+                    permissions[pageName] = checkbox.checked;
+                });
+                
+                // Envoyer les permissions au serveur
+                const response = await fetch('/api/utilisateurs/' + userId + '/permissions', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ permissions: permissions })
+                });
+                
+                if (!response.ok) {
+                    console.error('Erreur sauvegarde permissions');
+                }
+            } catch (error) {
+                console.error('Erreur sauvegarde permissions:', error);
+            }
+        }
+        
+        async function genererLienReset(userId, username) {
+            if (!confirm('Générer un lien de réinitialisation pour "' + username + '" ?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/utilisateurs/' + userId + '/generer-lien-reset', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Afficher le modal avec les informations
+                    const infoDiv = document.getElementById('reset-info');
+                    
+                    let html = '<div class="success-box">';
+                    html += '<h4><i class="fas fa-check-circle"></i> Lien généré avec succès !</h4>';
+                    html += '<p><strong>Utilisateur :</strong> ' + username + '</p>';
+                    html += '<p><strong>Validité :</strong> 24 heures (jusqu\'au ' + result.expiry + ')</p>';
+                    html += '</div>';
+                    
+                    html += '<div class="link-box">';
+                    html += '<label>Lien de réinitialisation :</label>';
+                    html += '<div class="copy-container">';
+                    html += '<input type="text" id="reset-link" value="' + result.reset_link + '" readonly class="form-control">';
+                    html += '<button class="btn-copy" onclick="copierLien()">';
+                    html += '<i class="fas fa-copy"></i> Copier';
+                    html += '</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    // Ajouter section SMS si téléphone disponible
+                    if (result.user_telephone) {
+                        html += '<div class="sms-box">';
+                        html += '<h5><i class="fas fa-sms"></i> Message SMS</h5>';
+                        html += '<p><strong>Téléphone :</strong> ' + result.user_telephone + '</p>';
+                        html += '<textarea readonly class="form-control" rows="3">' + result.message_sms + '</textarea>';
+                        html += '<button class="btn-copy-sms" onclick="copierSMS()">';
+                        html += '<i class="fas fa-copy"></i> Copier le message SMS';
+                        html += '</button>';
+                        html += '<p class="info-text"><i class="fas fa-info-circle"></i> Envoyez ce SMS via votre téléphone</p>';
+                        html += '</div>';
+                    }
+                    
+                    // Ajouter section Email
+                    html += '<div class="email-box">';
+                    html += '<h5><i class="fas fa-envelope"></i> Message Email</h5>';
+                    html += '<p><strong>Email :</strong> ' + result.user_email + '</p>';
+                    
+                    if (result.email_sent) {
+                        html += '<div class="alert-success" style="padding: 10px; margin: 10px 0; border-radius: 5px; background: #d4edda; color: #155724;">';
+                        html += '<i class="fas fa-check-circle"></i> <strong>Email envoyé automatiquement !</strong>';
+                        html += '<p style="margin: 5px 0 0 0;">' + result.email_message + '</p>';
+                        html += '</div>';
+                    } else {
+                        html += '<button class="btn-send-email" onclick="envoyerEmailAuto(' + userId + ', \'' + result.user_email + '\')" style="margin-bottom: 10px;">';
+                        html += '<i class="fas fa-paper-plane"></i> Envoyer l\'email automatiquement';
+                        html += '</button>';
+                    }
+                    
+                    html += '<textarea readonly class="form-control" rows="8">' + result.message_email + '</textarea>';
+                    html += '<button class="btn-copy-email" onclick="copierEmail()">';
+                    html += '<i class="fas fa-copy"></i> Copier le message Email';
+                    html += '</button>';
+                    html += '<p class="info-text"><i class="fas fa-info-circle"></i> Ou copiez et envoyez manuellement</p>';
+                    html += '</div>';
+                    
+                    infoDiv.innerHTML = html;
+                    document.getElementById('modalReset').style.display = 'block';
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        function fermerModalReset() {
+            document.getElementById('modalReset').style.display = 'none';
+        }
+        
+        function copierLien() {
+            const input = document.getElementById('reset-link');
+            input.select();
+            document.execCommand('copy');
+            alert('✅ Lien copié dans le presse-papiers !');
+        }
+        
+        function copierSMS() {
+            const textarea = document.querySelector('.sms-box textarea');
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ Message SMS copié !');
+        }
+        
+        function copierEmail() {
+            const textarea = document.querySelector('.email-box textarea');
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ Message email copié !');
+        }
+        
+        async function envoyerEmailAuto(userId, userEmail) {
+            if (!confirm('Envoyer l\'email de réinitialisation à ' + userEmail + ' ?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/utilisateurs/' + userId + '/generer-lien-reset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        send_email: true
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.email_sent) {
+                    alert('✅ ' + result.email_message);
+                    // Recharger le modal pour afficher le statut "envoyé"
+                    fermerModalReset();
+                    genererLienReset(userId, '');
+                } else {
+                    alert('❌ Erreur: ' + (result.email_message || 'Email non envoyé'));
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur d\'envoi');
+            }
+        }
+        
+        async function supprimerUtilisateur(userId, username) {
+            if (!confirm('Voulez-vous vraiment supprimer l\'utilisateur "' + username + '" ?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/utilisateurs/' + userId + '/supprimer', {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ ' + result.message);
+                    location.reload();
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        // Fermer modal en cliquant dehors
+        window.onclick = function(event) {
+            const modalCreer = document.getElementById('modalCreer');
+            const modalModifier = document.getElementById('modalModifier');
+            const modalReset = document.getElementById('modalReset');
+            
+            if (event.target == modalCreer) {
+                fermerModalCreer();
+            }
+            if (event.target == modalModifier) {
+                fermerModalModifier();
+            }
+            if (event.target == modalReset) {
+                fermerModalReset();
+            }
+        };
+    </script>
+
+    <style>
+        .user-info {
+            margin-right: 20px;
+            color: #2C3E50;
+            font-weight: 600;
+        }
+        
+        .btn-logout {
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-logout:hover {
+            background: #c0392b;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .btn-action.btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-action.btn-warning:hover {
+            background: #e67e22;
+        }
+        
+        .modal-large {
+            max-width: 700px;
+        }
+        
+        .success-box {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .success-box h4 {
+            margin: 0 0 15px 0;
+            color: #155724;
+        }
+        
+        .success-box i {
+            color: #28a745;
+            margin-right: 10px;
+        }
+        
+        .link-box, .sms-box, .email-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .link-box label, .sms-box h5, .email-box h5 {
+            display: block;
+            margin-bottom: 10px;
+            color: #2C3E50;
+            font-weight: 700;
+        }
+        
+        .copy-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .copy-container input {
+            flex: 1;
+        }
+        
+        .btn-copy, .btn-copy-sms, .btn-copy-email {
+            padding: 10px 20px;
+            background: #3498DB;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        
+        .btn-copy:hover, .btn-copy-sms:hover, .btn-copy-email:hover {
+            background: #2980b9;
+        }
+        
+        .btn-send-email {
+            padding: 12px 24px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            width: 100%;
+        }
+        
+        .btn-send-email:hover {
+            background: #229954;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+        }
+        
+        .btn-send-email i {
+            margin-right: 8px;
+        }
+        
+        .btn-copy-sms, .btn-copy-email {
+            margin-top: 10px;
+            display: block;
+        }
+        
+        .info-text {
+            margin-top: 10px;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+        
+        .info-text i {
+            margin-right: 5px;
+            color: #3498DB;
+        }
+        
+        .sms-box textarea, .email-box textarea {
+            width: 100%;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        /* Styles pour les permissions */
+        .permissions-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .permissions-section h4 {
+            color: #2C3E50;
+            margin: 0 0 10px 0;
+        }
+        
+        .permissions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        
+        .permission-item {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .permission-item:hover {
+            border-color: #3498DB;
+            background: #f0f8ff;
+        }
+        
+        .permission-item.active {
+            border-color: #27ae60;
+            background: #d4edda;
+        }
+        
+        .permission-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+        
+        .permission-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+            color: #2C3E50;
+            flex: 1;
+        }
+        
+        .permission-icon {
+            margin-right: 8px;
+            color: #3498DB;
+        }
+    </style>
+</body>
+</html>

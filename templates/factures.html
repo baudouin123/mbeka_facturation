@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factures - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-receipt"></i> Gestion des Factures</h1>
+                    <p class="subtitle">Toutes vos factures et leur statut de paiement</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('nouvelle_facture_client') }}" class="nav-link">
+                <i class="fas fa-file-invoice-dollar"></i> Facture Client
+            </a>
+            <a href="{{ url_for('nouvelle_facture_employe') }}" class="nav-link">
+                <i class="fas fa-user-tie"></i> Facture Employé
+            </a>
+            <a href="{{ url_for('employes') }}" class="nav-link">
+                <i class="fas fa-users"></i> Employés
+            </a>
+            <a href="{{ url_for('clients') }}" class="nav-link">
+                <i class="fas fa-building"></i> Clients
+            </a>
+            <a href="{{ url_for('factures') }}" class="nav-link active">
+                <i class="fas fa-receipt"></i> Factures
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <!-- Statistiques de paiement -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #3498DB;">
+                        <i class="fas fa-file-invoice"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="stat-total">0</h3>
+                        <p>Total factures</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #2ecc71;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="stat-payees">0</h3>
+                        <p>Factures payées</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #e74c3c;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="stat-impayees">0</h3>
+                        <p>Factures impayées</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #f39c12;">
+                        <i class="fas fa-euro-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="stat-montant">0 €</h3>
+                        <p>Reste à payer</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boutons d'export -->
+            <div class="export-buttons">
+                <h3><i class="fas fa-download"></i> Exporter les données</h3>
+                <div class="export-actions">
+                    <button class="btn-export excel" onclick="exporterExcel()">
+                        <i class="fas fa-file-excel"></i> Exporter en Excel
+                    </button>
+                    <button class="btn-export csv" onclick="exporterCSV()">
+                        <i class="fas fa-file-csv"></i> Exporter en CSV
+                    </button>
+                    <button class="btn-export" onclick="afficherModalPeriode()">
+                        <i class="fas fa-calendar"></i> Exporter par période
+                    </button>
+                </div>
+            </div>
+
+            <!-- Boutons d'impression groupée -->
+            <div class="print-buttons">
+                <h3><i class="fas fa-print"></i> Impression Groupée</h3>
+                <div class="print-actions">
+                    <button class="btn-print" onclick="afficherModalSelection()">
+                        <i class="fas fa-check-square"></i> Sélectionner et Imprimer
+                    </button>
+                    <button class="btn-print zip" onclick="afficherModalPeriodeZip()">
+                        <i class="fas fa-file-archive"></i> Télécharger Période en ZIP
+                    </button>
+                    <button class="btn-print batch" onclick="afficherModalBulletins()">
+                        <i class="fas fa-users"></i> Générer Bulletins du Mois
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtres -->
+            <div class="filters-container">
+                <div class="filter-group">
+                    <label for="filter-type"><i class="fas fa-filter"></i> Type :</label>
+                    <select id="filter-type" class="filter-select" onchange="filtrerFactures()">
+                        <option value="all">Tous les types</option>
+                        <option value="client">Factures clients</option>
+                        <option value="employe">Bulletins employés</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filter-paiement"><i class="fas fa-money-bill-wave"></i> Paiement :</label>
+                    <select id="filter-paiement" class="filter-select" onchange="filtrerFactures()">
+                        <option value="all">Tous les statuts</option>
+                        <option value="payee">✅ Payées</option>
+                        <option value="impayee">❌ Impayées</option>
+                        <option value="en_retard">⚠️ En retard</option>
+                        <option value="partielle">🟡 Partielles</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filter-search"><i class="fas fa-search"></i> Rechercher :</label>
+                    <input type="text" id="filter-search" class="filter-input" 
+                           placeholder="N° facture, client..." oninput="filtrerFactures()">
+                </div>
+            </div>
+
+            <!-- Liste des factures -->
+            <div class="form-section">
+                <h2><i class="fas fa-list"></i> Toutes les factures</h2>
+                
+                <div class="table-responsive">
+                    <table class="data-table" id="facturesTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                                <th>N° Facture</th>
+                                <th>Type</th>
+                                <th>Client/Employé</th>
+                                <th>Date</th>
+                                <th>Montant</th>
+                                <th>Statut Paiement</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="facturesBody">
+                            <!-- Chargé dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="empty-state" id="noFacturesMessage" style="display: none;">
+                    <i class="fas fa-file-invoice fa-4x"></i>
+                    <h3>Aucune facture trouvée</h3>
+                    <p>Aucune facture ne correspond à vos critères de recherche</p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+
+    <!-- Modal pour marquer comme payée -->
+    <div id="modalPaiement" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-money-check-alt"></i> Enregistrer un paiement</h3>
+                <button class="btn-close" onclick="fermerModalPaiement()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <p><strong>Facture :</strong> <span id="modal-facture-numero"></span></p>
+                <p><strong>Montant total :</strong> <span id="modal-facture-montant"></span> €</p>
+                
+                <input type="hidden" id="modal-facture-id">
+                
+                <div class="form-group">
+                    <label for="modal-statut">Statut de paiement *</label>
+                    <select id="modal-statut" class="form-control" onchange="afficherChampsMontant()">
+                        <option value="payee">✅ Payée intégralement</option>
+                        <option value="partielle">🟡 Paiement partiel</option>
+                        <option value="impayee">❌ Impayée</option>
+                        <option value="en_retard">⚠️ En retard</option>
+                    </select>
+                </div>
+                
+                <div id="champs-paiement" style="display: block;">
+                    <div class="form-group" id="champ-montant" style="display: none;">
+                        <label for="modal-montant-paye">Montant payé *</label>
+                        <input type="number" id="modal-montant-paye" step="0.01" min="0" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="modal-methode">Méthode de paiement</label>
+                        <select id="modal-methode" class="form-control">
+                            <option value="virement">💳 Virement bancaire</option>
+                            <option value="cheque">📝 Chèque</option>
+                            <option value="especes">💵 Espèces</option>
+                            <option value="carte">💳 Carte bancaire</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalPaiement()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="enregistrerPaiement()">
+                    <i class="fas fa-save"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal pour export par période -->
+    <div id="modalPeriode" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-calendar"></i> Exporter par période</h3>
+                <button class="btn-close" onclick="fermerModalPeriode()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="date-debut">Date de début</label>
+                    <input type="date" id="date-debut" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="date-fin">Date de fin</label>
+                    <input type="date" id="date-fin" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="format-export">Format d'export</label>
+                    <select id="format-export" class="form-control">
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="csv">CSV (.csv)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalPeriode()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="exporterParPeriode()">
+                    <i class="fas fa-download"></i> Exporter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal sélection factures pour impression -->
+    <div id="modalSelection" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-square"></i> Imprimer les factures sélectionnées</h3>
+                <button class="btn-close" onclick="fermerModalSelection()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <p><strong><span id="nb-selections">0</span> facture(s) sélectionnée(s)</strong></p>
+                <p>Choisissez le format de téléchargement :</p>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalSelection()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="telechargerSelectionZip()">
+                    <i class="fas fa-file-archive"></i> ZIP (séparés)
+                </button>
+                <button class="btn-primary" onclick="telechargerSelectionFusion()">
+                    <i class="fas fa-file-pdf"></i> PDF Fusionné
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal téléchargement période ZIP -->
+    <div id="modalPeriodeZip" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-archive"></i> Télécharger période en ZIP</h3>
+                <button class="btn-close" onclick="fermerModalPeriodeZip()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="zip-date-debut">Date de début</label>
+                    <input type="date" id="zip-date-debut" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="zip-date-fin">Date de fin</label>
+                    <input type="date" id="zip-date-fin" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="zip-type">Type de factures</label>
+                    <select id="zip-type" class="form-control">
+                        <option value="all">Toutes</option>
+                        <option value="client">Factures clients uniquement</option>
+                        <option value="employe">Bulletins employés uniquement</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalPeriodeZip()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="telechargerPeriodeZip()">
+                    <i class="fas fa-download"></i> Télécharger ZIP
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal génération bulletins du mois -->
+    <div id="modalBulletins" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-users"></i> Générer tous les bulletins du mois</h3>
+                <button class="btn-close" onclick="fermerModalBulletins()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="bulletins-mois">Mois</label>
+                    <input type="month" id="bulletins-mois" class="form-control" value="">
+                </div>
+                
+                <div class="warning-box">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <strong>⚠️ Attention :</strong>
+                        <p>Cette action va générer automatiquement un bulletin de paie pour chaque employé actif ayant des livraisons ce mois-ci.</p>
+                        <p>Les bulletins déjà existants pour ce mois seront ignorés.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModalBulletins()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn-primary" onclick="genererBulletinsMois()">
+                    <i class="fas fa-cogs"></i> Générer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let facturesData = [];
+        let factureActuelle = null;
+        
+        // Charger les factures au démarrage
+        document.addEventListener('DOMContentLoaded', function() {
+            chargerFactures();
+            chargerStatistiques();
+        });
+        
+        // Charger toutes les factures
+        async function chargerFactures() {
+            try {
+                // Charger factures clients
+                const responseClients = await fetch('/api/factures?type=client');
+                const facturesClients = await responseClients.json();
+                
+                // Charger bulletins employés
+                const responseEmployes = await fetch('/api/factures?type=employe');
+                const facturesEmployes = await responseEmployes.json();
+                
+                // Combiner toutes les factures
+                facturesData = [...facturesClients, ...facturesEmployes];
+                
+                afficherFactures(facturesData);
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors du chargement des factures');
+            }
+        }
+        
+        // Afficher les factures
+        function afficherFactures(factures) {
+            const tbody = document.getElementById('facturesBody');
+            const noFacturesMessage = document.getElementById('noFacturesMessage');
+            
+            tbody.innerHTML = '';
+            
+            if (factures.length === 0) {
+                tbody.parentElement.parentElement.style.display = 'none';
+                noFacturesMessage.style.display = 'block';
+                return;
+            }
+            
+            tbody.parentElement.parentElement.style.display = 'table';
+            noFacturesMessage.style.display = 'none';
+            
+            factures.forEach(facture => {
+                const tr = document.createElement('tr');
+                
+                // Badge statut paiement
+                let badgeStatut = '';
+                switch(facture.statut_paiement) {
+                    case 'payee':
+                        badgeStatut = '<span class="badge badge-success">✅ Payée</span>';
+                        break;
+                    case 'impayee':
+                        badgeStatut = '<span class="badge badge-danger">❌ Impayée</span>';
+                        break;
+                    case 'en_retard':
+                        badgeStatut = '<span class="badge badge-warning">⚠️ En retard</span>';
+                        break;
+                    case 'partielle':
+                        badgeStatut = '<span class="badge badge-info">🟡 Partielle</span>';
+                        break;
+                    default:
+                        badgeStatut = '<span class="badge badge-secondary">-</span>';
+                }
+                
+                // Badge type
+                const badgeType = facture.type_facture === 'client' 
+                    ? '<span class="badge badge-primary">Client</span>'
+                    : '<span class="badge badge-info">Employé</span>';
+                
+                const nomDestinataire = facture.type_facture === 'client' 
+                    ? facture.client_nom 
+                    : facture.employe_nom;
+                
+                // Email du destinataire
+                const emailDestinataire = facture.type_facture === 'client'
+                    ? (facture.client_email || '')
+                    : (facture.employe_email || '');
+                
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="facture-checkbox" value="${facture.id}" onchange="updateSelectionCount()"></td>
+                    <td><strong>${facture.numero}</strong></td>
+                    <td>${badgeType}</td>
+                    <td>${nomDestinataire}</td>
+                    <td>${facture.date_facture}</td>
+                    <td><strong>${facture.total_net.toFixed(2)} €</strong></td>
+                    <td>${badgeStatut}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action" title="Télécharger PDF" onclick="telechargerFacture(${facture.id})">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="btn-action btn-email" title="Envoyer par email" onclick="envoyerFactureEmail(${facture.id}, '${facture.numero}', '${emailDestinataire}')">
+                                <i class="fas fa-envelope"></i>
+                            </button>
+                            <button class="btn-action" title="Gérer paiement" onclick="ouvrirModalPaiement(${facture.id}, '${facture.numero}', ${facture.total_net})">
+                                <i class="fas fa-money-check-alt"></i>
+                            </button>
+                            <button class="btn-action btn-danger" title="Supprimer" onclick="supprimerFacture(${facture.id}, '${facture.numero}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // Filtrer les factures
+        function filtrerFactures() {
+            const typeFiltre = document.getElementById('filter-type').value;
+            const paiementFiltre = document.getElementById('filter-paiement').value;
+            const recherche = document.getElementById('filter-search').value.toLowerCase();
+            
+            let facturesFiltrees = facturesData;
+            
+            // Filtrer par type
+            if (typeFiltre !== 'all') {
+                facturesFiltrees = facturesFiltrees.filter(f => f.type_facture === typeFiltre);
+            }
+            
+            // Filtrer par statut paiement
+            if (paiementFiltre !== 'all') {
+                facturesFiltrees = facturesFiltrees.filter(f => f.statut_paiement === paiementFiltre);
+            }
+            
+            // Filtrer par recherche
+            if (recherche) {
+                facturesFiltrees = facturesFiltrees.filter(f => 
+                    f.numero.toLowerCase().includes(recherche) ||
+                    f.client_nom.toLowerCase().includes(recherche) ||
+                    f.employe_nom.toLowerCase().includes(recherche)
+                );
+            }
+            
+            afficherFactures(facturesFiltrees);
+        }
+        
+        // Charger les statistiques
+        async function chargerStatistiques() {
+            try {
+                const response = await fetch('/api/factures/statistiques-paiements');
+                const stats = await response.json();
+                
+                document.getElementById('stat-total').textContent = stats.nb_factures;
+                document.getElementById('stat-payees').textContent = stats.nb_payees;
+                document.getElementById('stat-impayees').textContent = stats.nb_impayees + stats.nb_en_retard;
+                document.getElementById('stat-montant').textContent = stats.total_a_payer.toFixed(2) + ' €';
+            } catch (error) {
+                console.error('Erreur stats:', error);
+            }
+        }
+        
+        // Modal paiement
+        function ouvrirModalPaiement(factureId, numero, montant) {
+            document.getElementById('modal-facture-id').value = factureId;
+            document.getElementById('modal-facture-numero').textContent = numero;
+            document.getElementById('modal-facture-montant').textContent = montant.toFixed(2);
+            document.getElementById('modal-montant-paye').value = montant.toFixed(2);
+            
+            document.getElementById('modalPaiement').style.display = 'block';
+        }
+        
+        function fermerModalPaiement() {
+            document.getElementById('modalPaiement').style.display = 'none';
+        }
+        
+        function afficherChampsMontant() {
+            const statut = document.getElementById('modal-statut').value;
+            const champMontant = document.getElementById('champ-montant');
+            const champsPaiement = document.getElementById('champs-paiement');
+            
+            if (statut === 'partielle') {
+                champMontant.style.display = 'block';
+                champsPaiement.style.display = 'block';
+            } else if (statut === 'payee') {
+                champMontant.style.display = 'none';
+                champsPaiement.style.display = 'block';
+            } else {
+                champsPaiement.style.display = 'none';
+            }
+        }
+        
+        async function enregistrerPaiement() {
+            const factureId = document.getElementById('modal-facture-id').value;
+            const statut = document.getElementById('modal-statut').value;
+            const methode = document.getElementById('modal-methode').value;
+            const montantPaye = document.getElementById('modal-montant-paye').value;
+            
+            const data = {
+                statut_paiement: statut,
+                methode_paiement: methode
+            };
+            
+            if (statut === 'partielle') {
+                data.montant_paye = parseFloat(montantPaye);
+            }
+            
+            try {
+                const response = await fetch(`/api/factures/${factureId}/paiement`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ ' + result.message);
+                    fermerModalPaiement();
+                    chargerFactures();
+                    chargerStatistiques();
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        function telechargerFacture(factureId) {
+            window.location.href = `/telecharger_facture/${factureId}`;
+        }
+        
+        async function supprimerFacture(factureId, numero) {
+            if (!confirm(`Voulez-vous vraiment supprimer la facture ${numero} ?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/factures/${factureId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ ' + result.message);
+                    chargerFactures();
+                    chargerStatistiques();
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+            }
+        }
+        
+        // Fermer modal en cliquant dehors
+        window.onclick = function(event) {
+            const modal = document.getElementById('modalPaiement');
+            const modalPeriode = document.getElementById('modalPeriode');
+            if (event.target == modal) {
+                fermerModalPaiement();
+            }
+            if (event.target == modalPeriode) {
+                fermerModalPeriode();
+            }
+        };
+        
+        // Fonctions d'export
+        function exporterExcel() {
+            window.location.href = '/api/export/factures/excel';
+        }
+        
+        function exporterCSV() {
+            window.location.href = '/api/export/factures/csv';
+        }
+        
+        function afficherModalPeriode() {
+            document.getElementById('modalPeriode').style.display = 'block';
+        }
+        
+        function fermerModalPeriode() {
+            document.getElementById('modalPeriode').style.display = 'none';
+        }
+        
+        function exporterParPeriode() {
+            const dateDebut = document.getElementById('date-debut').value;
+            const dateFin = document.getElementById('date-fin').value;
+            const format = document.getElementById('format-export').value;
+            
+            if (!dateDebut || !dateFin) {
+                alert('⚠️ Veuillez sélectionner une date de début et une date de fin');
+                return;
+            }
+            
+            const url = `/api/export/factures/${format}?date_debut=${dateDebut}&date_fin=${dateFin}`;
+            window.location.href = url;
+            
+            fermerModalPeriode();
+        }
+        
+        // ==== FONCTIONS IMPRESSION GROUPÉE ====
+        
+        // Sélection de factures
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('.facture-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateSelectionCount();
+        }
+        
+        function updateSelectionCount() {
+            const checkboxes = document.querySelectorAll('.facture-checkbox:checked');
+            document.getElementById('nb-selections').textContent = checkboxes.length;
+        }
+        
+        function getSelectedFactures() {
+            const checkboxes = document.querySelectorAll('.facture-checkbox:checked');
+            return Array.from(checkboxes).map(cb => parseInt(cb.value));
+        }
+        
+        // Modals impression
+        function afficherModalSelection() {
+            const selected = getSelectedFactures();
+            if (selected.length === 0) {
+                alert('⚠️ Veuillez sélectionner au moins une facture');
+                return;
+            }
+            document.getElementById('nb-selections').textContent = selected.length;
+            document.getElementById('modalSelection').style.display = 'block';
+        }
+        
+        function fermerModalSelection() {
+            document.getElementById('modalSelection').style.display = 'none';
+        }
+        
+        function afficherModalPeriodeZip() {
+            // Mettre le mois en cours par défaut
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            
+            document.getElementById('zip-date-debut').value = firstDay.toISOString().split('T')[0];
+            document.getElementById('zip-date-fin').value = lastDay.toISOString().split('T')[0];
+            
+            document.getElementById('modalPeriodeZip').style.display = 'block';
+        }
+        
+        function fermerModalPeriodeZip() {
+            document.getElementById('modalPeriodeZip').style.display = 'none';
+        }
+        
+        function afficherModalBulletins() {
+            // Mettre le mois en cours par défaut
+            const today = new Date();
+            const moisCourant = today.toISOString().slice(0, 7);
+            document.getElementById('bulletins-mois').value = moisCourant;
+            
+            document.getElementById('modalBulletins').style.display = 'block';
+        }
+        
+        function fermerModalBulletins() {
+            document.getElementById('modalBulletins').style.display = 'none';
+        }
+        
+        // Téléchargements
+        async function telechargerSelectionZip() {
+            const selected = getSelectedFactures();
+            
+            if (selected.length === 0) {
+                alert('⚠️ Aucune facture sélectionnée');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/impression/factures-zip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ facture_ids: selected })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.headers.get('Content-Disposition').split('filename=')[1].replace(/"/g, '');
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    fermerModalSelection();
+                    alert(`✅ ${selected.length} facture(s) téléchargée(s) en ZIP`);
+                } else {
+                    const error = await response.json();
+                    alert('❌ Erreur: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de téléchargement');
+            }
+        }
+        
+        async function telechargerSelectionFusion() {
+            const selected = getSelectedFactures();
+            
+            if (selected.length === 0) {
+                alert('⚠️ Aucune facture sélectionnée');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/impression/factures-fusion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ facture_ids: selected })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `factures_fusionnees_${new Date().toISOString().slice(0,10)}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    fermerModalSelection();
+                    alert(`✅ ${selected.length} facture(s) fusionnée(s) en 1 PDF`);
+                } else {
+                    const error = await response.json();
+                    alert('❌ Erreur: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de fusion');
+            }
+        }
+        
+        async function telechargerPeriodeZip() {
+            const dateDebut = document.getElementById('zip-date-debut').value;
+            const dateFin = document.getElementById('zip-date-fin').value;
+            const type = document.getElementById('zip-type').value;
+            
+            if (!dateDebut || !dateFin) {
+                alert('⚠️ Veuillez sélectionner les dates');
+                return;
+            }
+            
+            try {
+                const url = `/api/impression/periode-zip?date_debut=${dateDebut}&date_fin=${dateFin}&type=${type}`;
+                window.location.href = url;
+                
+                fermerModalPeriodeZip();
+                setTimeout(() => alert('✅ Téléchargement en cours...'), 500);
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de téléchargement');
+            }
+        }
+        
+        async function genererBulletinsMois() {
+            const mois = document.getElementById('bulletins-mois').value;
+            
+            if (!mois) {
+                alert('⚠️ Veuillez sélectionner un mois');
+                return;
+            }
+            
+            if (!confirm(`Générer les bulletins pour tous les employés actifs du mois ${mois} ?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/impression/bulletins-mois', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mois: mois })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    let message = `✅ ${result.bulletins_crees} bulletin(s) créé(s)\n\n`;
+                    
+                    if (result.details.length > 0) {
+                        message += 'Bulletins créés :\n';
+                        result.details.forEach(b => {
+                            message += `- ${b.employe}: ${b.numero} (${b.montant.toFixed(2)} €)\n`;
+                        });
+                    }
+                    
+                    if (result.erreurs.length > 0) {
+                        message += '\n⚠️ Erreurs :\n';
+                        result.erreurs.forEach(e => message += `- ${e}\n`);
+                    }
+                    
+                    alert(message);
+                    fermerModalBulletins();
+                    chargerFactures(); // Recharger la liste
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de génération');
+            }
+        }
+
+        // ============================================================================
+        // ENVOI DE FACTURE PAR EMAIL
+        // ============================================================================
+        
+        async function envoyerFactureEmail(factureId, numeroFacture, emailDestinataire) {
+            // Vérifier que le destinataire a un email
+            if (!emailDestinataire || emailDestinataire === 'None' || emailDestinataire === '' || emailDestinataire === 'null') {
+                alert(
+                    '❌ Impossible d\'envoyer l\'email\n\n' +
+                    'Le destinataire n\'a pas d\'adresse email configurée.\n\n' +
+                    'Veuillez d\'abord ajouter une adresse email au client ou à l\'employé ' +
+                    'dans la section "Clients" ou "Employés".'
+                );
+                return;
+            }
+            
+            // Demander confirmation
+            const confirmation = confirm(
+                '📧 Envoyer la facture par email ?\n\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+                'Facture : ' + numeroFacture + '\n' +
+                'Destinataire : ' + emailDestinataire + '\n\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+                'Un email sera envoyé avec :\n' +
+                '✓ PDF de la facture en pièce jointe\n' +
+                '✓ Détails de la facture\n' +
+                '✓ Coordonnées de paiement\n\n' +
+                'Confirmez-vous l\'envoi ?'
+            );
+            
+            if (!confirmation) {
+                return;
+            }
+            
+            try {
+                // Afficher un indicateur de chargement
+                const button = event.target.closest('button');
+                const originalHTML = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                button.disabled = true;
+                
+                // Appeler l'API
+                const response = await fetch('/api/factures/' + factureId + '/envoyer-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                // Restaurer le bouton
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+                
+                if (response.ok && result.success) {
+                    alert(
+                        '✅ Email envoyé avec succès !\n\n' +
+                        result.message + '\n\n' +
+                        'Le destinataire devrait recevoir l\'email dans quelques instants.'
+                    );
+                } else {
+                    let errorMessage = result.error || 'Erreur inconnue';
+                    
+                    // Messages d'erreur plus conviviaux
+                    if (errorMessage.includes('Configuration email non faite')) {
+                        errorMessage = 
+                            'La configuration email n\'est pas terminée.\n\n' +
+                            'Veuillez configurer Gmail dans le fichier app.py.\n' +
+                            'Consultez le guide GUIDE_EMAIL_RECOVERY.md pour les instructions.';
+                    }
+                    
+                    if (errorMessage.includes('PDF introuvable')) {
+                        errorMessage = 
+                            'Le fichier PDF de cette facture est introuvable.\n\n' +
+                            'Veuillez régénérer la facture.';
+                    }
+                    
+                    alert('❌ Erreur lors de l\'envoi\n\n' + errorMessage);
+                }
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert(
+                    '❌ Erreur de connexion\n\n' +
+                    'Impossible de communiquer avec le serveur.\n' +
+                    'Vérifiez que Flask est en cours d\'exécution.'
+                );
+            }
+        }
+
+    </script>t>
+
+    <style>
+        /* Styles déjà définis dans style.css + ajouts spécifiques */
+        
+        .badge {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .badge-success {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .badge-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .badge-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .badge-info {
+            background: #3498DB;
+            color: white;
+        }
+        
+        .badge-primary {
+            background: #9b59b6;
+            color: white;
+        }
+        
+        .badge-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .filters-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2C3E50;
+            font-weight: 600;
+        }
+        
+        .filter-select, .filter-input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .filter-select:focus, .filter-input:focus {
+            border-color: #2ecc71;
+            outline: none;
+        }
+        
+        .export-buttons {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+        
+        .export-buttons h3 {
+            margin: 0 0 20px 0;
+            color: #2C3E50;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .export-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-export {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            background: #3498DB;
+            color: white;
+        }
+        
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn-export.excel {
+            background: #2ecc71;
+        }
+        
+        .btn-export.excel:hover {
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.3);
+        }
+        
+        .btn-export.csv {
+            background: #f39c12;
+        }
+        
+        .btn-export.csv:hover {
+            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.3);
+        }
+        
+        .print-buttons {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+        
+        .print-buttons h3 {
+            margin: 0 0 20px 0;
+            color: #2C3E50;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .print-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-print {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            background: #9b59b6;
+            color: white;
+        }
+        
+        .btn-print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(155, 89, 182, 0.3);
+        }
+        
+        .btn-print.zip {
+            background: #16a085;
+        }
+        
+        .btn-print.zip:hover {
+            box-shadow: 0 6px 20px rgba(22, 160, 133, 0.3);
+        }
+        
+        .btn-print.batch {
+            background: #e67e22;
+        }
+        
+        .btn-print.batch:hover {
+            box-shadow: 0 6px 20px rgba(230, 126, 34, 0.3);
+        }
+        
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .warning-box i {
+            font-size: 24px;
+            color: #f39c12;
+        }
+        
+        .warning-box p {
+            margin: 5px 0;
+            color: #2C3E50;
+        }
+        
+        /* Bouton Email */
+        .btn-email {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-email:hover {
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-email:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+    </style>
+</body>
+</html>

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de Bord - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-chart-line"></i> Tableau de Bord</h1>
+                    <p class="subtitle">Vue d'ensemble de votre activité</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('dashboard') }}" class="nav-link active">
+                <i class="fas fa-chart-line"></i> Tableau de Bord
+            </a>
+            <a href="{{ url_for('nouvelle_facture_client') }}" class="nav-link">
+                <i class="fas fa-file-invoice-dollar"></i> Facture Client
+            </a>
+            <a href="{{ url_for('nouvelle_facture_employe') }}" class="nav-link">
+                <i class="fas fa-user-tie"></i> Facture Employé
+            </a>
+            <a href="{{ url_for('employes') }}" class="nav-link">
+                <i class="fas fa-users"></i> Employés
+            </a>
+            <a href="{{ url_for('clients') }}" class="nav-link">
+                <i class="fas fa-building"></i> Clients
+            </a>
+            <a href="{{ url_for('factures') }}" class="nav-link">
+                <i class="fas fa-receipt"></i> Factures
+            </a>
+            <a href="{{ url_for('sauvegardes') }}" class="nav-link">
+                <i class="fas fa-database"></i> Sauvegardes
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <!-- KPI - Indicateurs clés -->
+            <div class="stats-grid-large">
+                <div class="stat-card-large">
+                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #3498DB, #2980b9);">
+                        <i class="fas fa-euro-sign"></i>
+                    </div>
+                    <div class="stat-content-large">
+                        <p class="stat-label">Chiffre d'affaires total</p>
+                        <h2 id="kpi-ca">0 €</h2>
+                        <span class="stat-trend" id="trend-ca"></span>
+                    </div>
+                </div>
+                
+                <div class="stat-card-large">
+                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content-large">
+                        <p class="stat-label">Montant payé</p>
+                        <h2 id="kpi-paye">0 €</h2>
+                        <span class="stat-trend positive" id="trend-paye"></span>
+                    </div>
+                </div>
+                
+                <div class="stat-card-large">
+                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-content-large">
+                        <p class="stat-label">Reste à payer</p>
+                        <h2 id="kpi-impaye">0 €</h2>
+                        <span class="stat-trend negative" id="trend-impaye"></span>
+                    </div>
+                </div>
+                
+                <div class="stat-card-large">
+                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-content-large">
+                        <p class="stat-label">Taux de paiement</p>
+                        <h2 id="kpi-taux">0%</h2>
+                        <span class="stat-trend" id="trend-taux"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graphiques principaux -->
+            <div class="charts-grid">
+                <!-- Graphique évolution revenus -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-chart-line"></i> Évolution des revenus (12 derniers mois)</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartRevenus"></canvas>
+                    </div>
+                </div>
+
+                <!-- Graphique répartition paiements -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-chart-pie"></i> Répartition des factures</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartPaiements"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deuxième ligne de graphiques -->
+            <div class="charts-grid">
+                <!-- Top 5 clients -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-building"></i> Top 5 Clients (CA)</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartClients"></canvas>
+                    </div>
+                </div>
+
+                <!-- Performance employés -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-users"></i> Performance Employés</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartEmployes"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiques détaillées -->
+            <div class="stats-details">
+                <div class="form-section">
+                    <h2><i class="fas fa-info-circle"></i> Statistiques détaillées</h2>
+                    <div class="stats-table">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Indicateur</th>
+                                    <th>Valeur</th>
+                                    <th>Détails</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Nombre total de factures</strong></td>
+                                    <td><span id="detail-factures">0</span></td>
+                                    <td>Toutes factures confondues</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Factures payées</strong></td>
+                                    <td><span id="detail-payees" class="text-success">0</span></td>
+                                    <td>Paiement intégral reçu</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Factures impayées</strong></td>
+                                    <td><span id="detail-impayees" class="text-danger">0</span></td>
+                                    <td>Aucun paiement ou en retard</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Paiements partiels</strong></td>
+                                    <td><span id="detail-partielles" class="text-warning">0</span></td>
+                                    <td>Paiement incomplet</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Nombre de clients</strong></td>
+                                    <td><span id="detail-clients">0</span></td>
+                                    <td>Clients actifs</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Nombre d'employés</strong></td>
+                                    <td><span id="detail-employes">0</span></td>
+                                    <td>Employés enregistrés</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+
+    <script>
+        let charts = {};
+        
+        // Charger les statistiques au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            chargerStatistiques();
+        });
+        
+        async function chargerStatistiques() {
+            try {
+                const response = await fetch('/api/dashboard/stats');
+                const data = await response.json();
+                
+                // Mettre à jour les KPI
+                document.getElementById('kpi-ca').textContent = formatMontant(data.general.total_ca);
+                document.getElementById('kpi-paye').textContent = formatMontant(data.general.total_paye);
+                document.getElementById('kpi-impaye').textContent = formatMontant(data.general.total_impaye);
+                document.getElementById('kpi-taux').textContent = data.general.taux_paiement.toFixed(1) + '%';
+                
+                // Mettre à jour les statistiques détaillées
+                document.getElementById('detail-factures').textContent = data.general.total_factures;
+                document.getElementById('detail-payees').textContent = data.paiements.payees;
+                document.getElementById('detail-impayees').textContent = data.paiements.impayees;
+                document.getElementById('detail-partielles').textContent = data.paiements.partielles;
+                document.getElementById('detail-clients').textContent = data.general.total_clients;
+                document.getElementById('detail-employes').textContent = data.general.total_employes;
+                
+                // Créer les graphiques
+                creerGraphiqueRevenus(data.revenus_par_mois);
+                creerGraphiquePaiements(data.paiements);
+                creerGraphiqueClients(data.top_clients);
+                creerGraphiqueEmployes(data.employes_stats);
+                
+            } catch (error) {
+                console.error('Erreur chargement stats:', error);
+                alert('Erreur lors du chargement des statistiques');
+            }
+        }
+        
+        function formatMontant(montant) {
+            return montant.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €';
+        }
+        
+        // Graphique évolution des revenus
+        function creerGraphiqueRevenus(data) {
+            const ctx = document.getElementById('chartRevenus').getContext('2d');
+            
+            if (charts.revenus) charts.revenus.destroy();
+            
+            charts.revenus = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: 'Revenus (€)',
+                        data: Object.values(data),
+                        borderColor: '#3498DB',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(0) + ' €';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Graphique répartition paiements
+        function creerGraphiquePaiements(data) {
+            const ctx = document.getElementById('chartPaiements').getContext('2d');
+            
+            if (charts.paiements) charts.paiements.destroy();
+            
+            charts.paiements = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Payées', 'Impayées', 'Partielles'],
+                    datasets: [{
+                        data: [data.payees, data.impayees, data.partielles],
+                        backgroundColor: [
+                            '#2ecc71',
+                            '#e74c3c',
+                            '#f39c12'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Graphique top clients
+        function creerGraphiqueClients(data) {
+            const ctx = document.getElementById('chartClients').getContext('2d');
+            
+            if (charts.clients) charts.clients.destroy();
+            
+            charts.clients = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: 'CA (€)',
+                        data: Object.values(data),
+                        backgroundColor: '#9b59b6',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(0) + ' €';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Graphique performance employés
+        function creerGraphiqueEmployes(data) {
+            const ctx = document.getElementById('chartEmployes').getContext('2d');
+            
+            if (charts.employes) charts.employes.destroy();
+            
+            const labels = data.map(e => e.nom);
+            const factures = data.map(e => e.factures);
+            const amendes = data.map(e => e.amendes);
+            
+            charts.employes = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Bulletins générés',
+                            data: factures,
+                            backgroundColor: '#2ecc71',
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Amendes',
+                            data: amendes,
+                            backgroundColor: '#e74c3c',
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+
+    <style>
+        .stats-grid-large {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card-large {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .stat-card-large:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+        }
+        
+        .stat-icon-large {
+            width: 70px;
+            height: 70px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+        }
+        
+        .stat-content-large {
+            flex: 1;
+        }
+        
+        .stat-label {
+            margin: 0 0 8px 0;
+            color: #7f8c8d;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .stat-content-large h2 {
+            margin: 0;
+            font-size: 32px;
+            color: #2C3E50;
+            font-weight: 700;
+        }
+        
+        .stat-trend {
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        
+        .stat-trend.positive {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .stat-trend.negative {
+            background: #fadbd8;
+            color: #c0392b;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .chart-header {
+            margin-bottom: 20px;
+        }
+        
+        .chart-header h3 {
+            margin: 0;
+            color: #2C3E50;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .stats-details {
+            margin-top: 40px;
+        }
+        
+        .text-success {
+            color: #2ecc71;
+            font-weight: 700;
+        }
+        
+        .text-danger {
+            color: #e74c3c;
+            font-weight: 700;
+        }
+        
+        .text-warning {
+            color: #f39c12;
+            font-weight: 700;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-content-large h2 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</body>
+</html>

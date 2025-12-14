@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historique - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-history"></i> Historique</h1>
+                    <p class="subtitle">Toutes les factures et clients</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('nouvelle_facture_client') }}" class="nav-link">
+                <i class="fas fa-file-invoice-dollar"></i> Nouvelle Facture
+            </a>
+            <a href="{{ url_for('employes') }}" class="nav-link">
+                <i class="fas fa-users"></i> Employés
+            </a>
+            <a href="{{ url_for('clients') }}" class="nav-link">
+                <i class="fas fa-building"></i> Clients
+            </a>
+            <a href="{{ url_for('historique') }}" class="nav-link active">
+                <i class="fas fa-history"></i> Historique
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <!-- Onglets -->
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="afficherOnglet('factures')">
+                    <i class="fas fa-file-invoice"></i> Factures ({{ factures|length }})
+                </button>
+                <button class="tab-btn" onclick="afficherOnglet('clients')">
+                    <i class="fas fa-building"></i> Clients
+                </button>
+            </div>
+
+            <!-- Onglet Factures -->
+            <div id="onglet-factures" class="onglet-content">
+                <div class="form-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-file-invoice"></i> Toutes les Factures</h2>
+                        <div class="header-actions">
+                            <button class="btn-refresh" onclick="window.location.reload()">
+                                <i class="fas fa-sync-alt"></i> Actualiser
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if factures %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Numéro</th>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>Client/Employé</th>
+                                    <th>Total HT</th>
+                                    <th>Total Net</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for facture in factures %}
+                                <tr id="facture-{{ facture.id }}">
+                                    <td><strong>{{ facture.numero }}</strong></td>
+                                    <td>
+                                        {% if facture.type_facture == 'client' %}
+                                        <span class="badge badge-success">
+                                            <i class="fas fa-building"></i> Client
+                                        </span>
+                                        {% else %}
+                                        <span class="badge" style="background: rgba(155, 89, 182, 0.1); color: #8e44ad; border: 1px solid rgba(155, 89, 182, 0.3);">
+                                            <i class="fas fa-user-tie"></i> Employé
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ facture.date_facture.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if facture.type_facture == 'client' %}
+                                            {{ facture.client.nom if facture.client else 'N/A' }}
+                                        {% else %}
+                                            {{ facture.employe.nom_complet() if facture.employe else 'N/A' }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ "%.2f"|format(facture.total_brut) }} €</td>
+                                    <td><strong>{{ "%.2f"|format(facture.total_net) }} €</strong></td>
+                                    <td>
+                                        <span class="badge badge-{{ 'success' if facture.statut == 'payee' else 'warning' }}">
+                                            {{ facture.statut|replace('_', ' ')|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            {% if facture.fichier_pdf %}
+                                            <a href="{{ url_for('voir_facture', facture_id=facture.id) }}" 
+                                               target="_blank" class="btn-action" title="Voir PDF">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ url_for('telecharger_facture', facture_id=facture.id) }}" 
+                                               class="btn-action" title="Télécharger">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                            {% endif %}
+                                            <button class="btn-action btn-danger" title="Supprimer" 
+                                                    onclick="supprimerFacture({{ facture.id }}, '{{ facture.numero }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4"><strong>Totaux</strong></td>
+                                    <td><strong>{{ "%.2f"|format(factures | sum(attribute='total_brut')) }} €</strong></td>
+                                    <td><strong>{{ "%.2f"|format(factures | sum(attribute='total_net')) }} €</strong></td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-file-invoice-dollar fa-4x"></i>
+                        <h3>Aucune facture</h3>
+                        <p>Commencez par créer votre première facture</p>
+                        <a href="{{ url_for('nouvelle_facture_client') }}" class="btn-primary">
+                            <i class="fas fa-plus-circle"></i> Créer une facture
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Onglet Clients -->
+            <div id="onglet-clients" class="onglet-content" style="display: none;">
+                <div class="form-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-building"></i> Liste des Clients</h2>
+                        <div class="header-actions">
+                            <a href="{{ url_for('clients') }}" class="btn-add">
+                                <i class="fas fa-plus"></i> Nouveau Client
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Adresse</th>
+                                    <th>Ville</th>
+                                    <th>Téléphone</th>
+                                    <th>Email</th>
+                                    <th>SIRET</th>
+                                    <th>Nb Factures</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsBody">
+                                <!-- Les clients seront chargés dynamiquement -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+
+    <script>
+        // Charger les clients au chargement de l'onglet
+        let clientsCharges = false;
+
+        function afficherOnglet(onglet) {
+            // Masquer tous les onglets
+            document.querySelectorAll('.onglet-content').forEach(el => el.style.display = 'none');
+            
+            // Désactiver tous les boutons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Afficher l'onglet sélectionné
+            if (onglet === 'factures') {
+                document.getElementById('onglet-factures').style.display = 'block';
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            } else if (onglet === 'clients') {
+                document.getElementById('onglet-clients').style.display = 'block';
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                
+                // Charger les clients si pas encore fait
+                if (!clientsCharges) {
+                    chargerClients();
+                    clientsCharges = true;
+                }
+            }
+        }
+
+        async function chargerClients() {
+            try {
+                const response = await fetch('/api/clients');
+                const clients = await response.json();
+                
+                const tbody = document.getElementById('clientsBody');
+                tbody.innerHTML = '';
+                
+                if (clients.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 40px; color: #95a5a6;">
+                                <i class="fas fa-building fa-3x" style="margin-bottom: 15px; display: block;"></i>
+                                Aucun client enregistré
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                for (const client of clients) {
+                    // Compter les factures du client
+                    const facturesResponse = await fetch(`/api/clients/${client.id}/factures-count`);
+                    let facturesCount = 0;
+                    if (facturesResponse.ok) {
+                        const data = await facturesResponse.json();
+                        facturesCount = data.count || 0;
+                    }
+                    
+                    const tr = document.createElement('tr');
+                    tr.id = `client-${client.id}`;
+                    tr.innerHTML = `
+                        <td><strong>${client.nom}</strong></td>
+                        <td>${client.adresse || '-'}</td>
+                        <td>${client.ville || '-'}</td>
+                        <td>${client.telephone || '-'}</td>
+                        <td>${client.email || '-'}</td>
+                        <td>${client.siret || '-'}</td>
+                        <td>
+                            <span class="badge ${facturesCount > 0 ? 'badge-success' : 'badge-warning'}">
+                                ${facturesCount} facture${facturesCount !== 1 ? 's' : ''}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-action" title="Voir factures" onclick="voirFacturesClient(${client.id})">
+                                    <i class="fas fa-file-invoice"></i>
+                                </button>
+                                <button class="btn-action btn-danger" title="Supprimer" 
+                                        onclick="supprimerClient(${client.id}, '${client.nom}', ${facturesCount})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            } catch (error) {
+                console.error('Erreur chargement clients:', error);
+                alert('❌ Erreur lors du chargement des clients');
+            }
+        }
+
+        async function supprimerFacture(factureId, numero) {
+            if (!confirm(`⚠️ Voulez-vous vraiment supprimer la facture ${numero} ?\n\nCette action est irréversible.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/factures/${factureId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const row = document.getElementById(`facture-${factureId}`);
+                    if (row) {
+                        row.style.backgroundColor = '#ffebee';
+                        row.style.transition = 'all 0.3s';
+                        setTimeout(() => {
+                            row.remove();
+                            
+                            // Vérifier s'il reste des factures
+                            const tbody = row.parentElement;
+                            if (tbody && tbody.children.length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+                    }
+                    
+                    alert('✅ ' + result.message);
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+                console.error(error);
+            }
+        }
+
+        async function supprimerClient(clientId, nom, facturesCount) {
+            if (facturesCount > 0) {
+                alert(`⚠️ Impossible de supprimer le client "${nom}".\n\nCe client a ${facturesCount} facture(s) associée(s).\n\nVeuillez d'abord supprimer ses factures.`);
+                return;
+            }
+            
+            if (!confirm(`⚠️ Voulez-vous vraiment supprimer le client "${nom}" ?\n\nCette action est irréversible.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/clients/${clientId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const row = document.getElementById(`client-${clientId}`);
+                    if (row) {
+                        row.style.backgroundColor = '#ffebee';
+                        row.style.transition = 'all 0.3s';
+                        setTimeout(() => row.remove(), 300);
+                    }
+                    
+                    alert('✅ ' + result.message);
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+                console.error(error);
+            }
+        }
+
+        function voirFacturesClient(clientId) {
+            // Rediriger vers la page factures avec filtre client
+            window.location.href = `/factures?client=${clientId}`;
+        }
+    </script>
+
+    <style>
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .tab-btn:hover {
+            color: #3498DB;
+            background: #f8f9fa;
+        }
+        
+        .tab-btn.active {
+            color: #3498DB;
+            border-bottom-color: #3498DB;
+            background: #f8f9fa;
+        }
+        
+        .onglet-content {
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .btn-danger {
+            color: #e74c3c !important;
+        }
+        
+        .btn-danger:hover {
+            background: #e74c3c !important;
+            color: white !important;
+            border-color: #e74c3c !important;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #7f8c8d;
+        }
+        
+        .empty-state i {
+            color: #BDC3C7;
+            margin-bottom: 30px;
+        }
+        
+        .empty-state h3 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+        
+        .empty-state p {
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+    </style>
+</body>
+</html>

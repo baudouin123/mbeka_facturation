@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Logs d'Activité - {{ entreprise['nom'] }}</title>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <header class="header rounded-xl shadow-lg animate-fade-in-up">
+    <div class="logo-section">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="logo-large">
+      <div class="logo-text">
+        <h1>Logs d'Activité</h1>
+        <div class="subtitle">{{ entreprise['nom'] }}</div>
+      </div>
+    </div>
+    <div class="entreprise-info">
+      <h2>{{ current_user.prenom if current_user.is_authenticated and current_user.prenom else (current_user.username if current_user.is_authenticated else 'Admin') }}</h2>
+      <p><a href="{{ url_for('logout') }}" class="btn-back">Déconnexion</a></p>
+    </div>
+  </header>
+
+  <!-- Main navigation -->
+  <nav class="main-nav">
+    <a class="nav-link" href="{{ url_for('index') }}">Accueil</a>
+    <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+    <a class="nav-link" href="{{ url_for('calendrier') }}">Calendrier</a>
+    <a class="nav-link" href="{{ url_for('factures') }}">Factures</a>
+    <a class="nav-link" href="{{ url_for('utilisateurs') }}">Utilisateurs</a>
+    <a class="nav-link active" href="{{ url_for('logs') }}">Logs</a>
+  </nav>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }} info-card mb-4">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- Filters -->
+  <section class="filters-container">
+    <div class="filter-group">
+      <label>Utilisateur</label>
+      <select name="user" class="filter-select" form="filters-form">
+        <option value="">Tous les utilisateurs</option>
+        {% for user in utilisateurs %}
+          <option value="{{ user.id }}" {% if user_filter and user_filter|int == user.id %}selected{% endif %}>
+            {{ user.prenom or user.username }} ({{ user.username }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Action</label>
+      <select name="action" class="filter-select" form="filters-form">
+        <option value="">Toutes les actions</option>
+        {% for action_type in actions_types %}
+          <option value="{{ action_type }}" {% if action_filter == action_type %}selected{% endif %}>{{ action_type }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Date début</label>
+      <input type="date" name="date_debut" value="{{ date_debut or '' }}" class="filter-input" form="filters-form">
+    </div>
+    <div class="filter-group">
+      <label>Date fin</label>
+      <input type="date" name="date_fin" value="{{ date_fin or '' }}" class="filter-input" form="filters-form">
+    </div>
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <div class="form-actions-inline">
+        <button type="submit" form="filters-form" class="btn-primary">Filtrer</button>
+        <a href="{{ url_for('logs') }}" class="btn-secondary">Réinitialiser</a>
+      </div>
+    </div>
+  </section>
+  <form id="filters-form" method="get" action="{{ url_for('logs') }}" class="hidden"></form>
+
+  <!-- Summary -->
+  <section class="summary-grid">
+    <div class="summary-item"><span class="summary-label">Logs affichés</span><span class="summary-value">{{ logs|length }}</span></div>
+    <div class="summary-item"><span class="summary-label">Connexions</span><span class="summary-value color-client">{{ logs|selectattr('action', 'equalto', 'connexion')|list|length }}</span></div>
+    <div class="summary-item"><span class="summary-label">Tentatives échouées</span><span class="summary-value color-amende">{{ logs|selectattr('action', 'equalto', 'tentative_connexion_echouee')|list|length }}</span></div>
+  </section>
+
+  <!-- Table -->
+  <section class="table-container">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date &amp; Heure</th>
+            <th>Utilisateur</th>
+            <th>Action</th>
+            <th>Détails</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if logs %}
+          {% for log in logs %}
+            <tr>
+              <td>{{ log.date.strftime('%d/%m/%Y %H:%M:%S') if log.date else '-' }}</td>
+              <td>{{ log.utilisateur_nom or 'Système' }}</td>
+              <td>
+                {% if log.action == 'connexion' %}Connexion
+                {% elif log.action == 'deconnexion' %}Déconnexion
+                {% elif log.action == 'tentative_connexion_echouee' %}Connexion échouée
+                {% elif log.action == 'creation_facture' %}Création facture
+                {% elif log.action == 'modification_facture' %}Modification facture
+                {% elif log.action == 'suppression_facture' %}Suppression facture
+                {% elif log.action == 'creation_utilisateur' %}Création utilisateur
+                {% elif log.action == 'modification_utilisateur' %}Modification utilisateur
+                {% elif log.action == 'suppression_utilisateur' %}Suppression utilisateur
+                {% elif log.action == 'changement_mot_de_passe' %}Changement mot de passe
+                {% elif log.action == 'envoi_email_reset' %}Envoi email reset
+                {% else %}{{ log.action }}{% endif %}
+              </td>
+              <td>{{ log.details or '-' }}</td>
+              <td>{{ log.ip_address or '-' }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="5" class="empty-state">Aucun log trouvé</td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if logs|length >= 1000 %}
+    <div class="info-card mt-3">Affichage limité aux 1000 derniers logs. Utilisez les filtres pour affiner votre recherche.</div>
+  {% endif %}
+
+  <footer class="footer">
+    <p>© {{ now.year }} {{ entreprise['nom'] }} — Journal des activités</p>
+  </footer>
+</div>
+
+<!-- CSS en fin de page, comme tes autres templates -->
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</body>
+</html>
