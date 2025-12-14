@@ -4246,6 +4246,32 @@ def auto_backup():
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
 
+        
+from werkzeug.security import generate_password_hash
+from yourmodels import db, User  # remplace par ton modèle User et db
+
+@app.route("/create-admin")
+def create_admin():
+    email = "admin@example.com"
+    password = "Admin123!"  # choisis un mot de passe fort
+ déjà", 200    username = "admin"
+
+    # Crée l'admin
+    new_admin = User(
+        email=email,
+        username=username,
+        password_hash=generate_password_hash(password)
+    )
+    db.session.add(new_admin)
+    db.session.commit()
+    return f"Admin créé : {email} / {password}", 201
+``
+
+    # Vérifie si l'admin existe déjà
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+
+
 if __name__ == '__main__':
     # ============================================================================
     # SÉCURITÉ : Invalider toutes les sessions au démarrage
@@ -4318,3 +4344,4 @@ if __name__ == '__main__':
     # Ceci est la dernière ligne, elle DOIT être atteinte pour lancer le serveur
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
