@@ -3,700 +3,290 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord - Mbeka Facturation</title>
+    <title>Gestion Clients - Mbeka</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <!-- En-tête -->
         <header class="header">
             <div class="logo-section">
                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
                 <div class="logo-text">
-                    <h1><i class="fas fa-chart-line"></i> Tableau de Bord</h1>
-                    <p class="subtitle">Gestion complète des factures clients et salariés</p>
+                    <h1><i class="fas fa-building"></i> Gestion des Clients</h1>
+                    <p class="subtitle">Gérez vos entreprises partenaires</p>
                 </div>
             </div>
-            <div class="header-info">
-                <div class="user-section">
-                    <span class="user-info">
-                        <i class="fas fa-user-circle"></i> 
-                        <strong>{{ current_user.prenom or current_user.username }}</strong>
-                        {% if current_user.role == 'admin' %}
-                            <span class="role-badge admin">👑 Admin</span>
-                        {% elif current_user.role == 'comptable' %}
-                            <span class="role-badge comptable">💼 Comptable</span>
-                        {% else %}
-                            <span class="role-badge employe">👤 Employé</span>
-                        {% endif %}
-                    </span>
-                    <a href="{{ url_for('logout') }}" class="btn-logout">
-                        <i class="fas fa-sign-out-alt"></i> Déconnexion
-                    </a>
-                </div>
-                <div class="entreprise-info">
-                    <h3>{{ entreprise.nom }}</h3>
-                    <p><i class="fas fa-map-marker-alt"></i> {{ entreprise.ville }}</p>
-                    <p><i class="fas fa-phone"></i> {{ entreprise.telephone }}</p>
-                </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
             </div>
         </header>
 
-        <!-- Navigation -->
         <nav class="main-nav">
-            <a href="{{ url_for('index') }}" class="nav-link active">
+            <a href="{{ url_for('index') }}" class="nav-link">
                 <i class="fas fa-home"></i> Accueil
-            </a>
-            <a href="{{ url_for('dashboard') }}" class="nav-link">
-                <i class="fas fa-chart-line"></i> Dashboard
-            </a>
-            <a href="{{ url_for('calendrier') }}" class="nav-link">
-                <i class="fas fa-calendar-alt"></i> Calendrier
             </a>
             <a href="{{ url_for('nouvelle_facture_client') }}" class="nav-link">
                 <i class="fas fa-file-invoice-dollar"></i> Facture Client
             </a>
-            <a href="{{ url_for('nouvelle_facture_employe') }}" class="nav-link">
-                <i class="fas fa-user-tie"></i> Facture Employé
+            <a href="{{ url_for('clients') }}" class="nav-link active">
+                <i class="fas fa-building"></i> Clients
             </a>
             <a href="{{ url_for('employes') }}" class="nav-link">
                 <i class="fas fa-users"></i> Employés
             </a>
-            <a href="{{ url_for('clients') }}" class="nav-link">
-                <i class="fas fa-building"></i> Clients
-            </a>
             <a href="{{ url_for('factures') }}" class="nav-link">
                 <i class="fas fa-receipt"></i> Factures
             </a>
-            <a href="{{ url_for('sauvegardes') }}" class="nav-link">
-                <i class="fas fa-database"></i> Sauvegardes
-            </a>
-            <a href="{{ url_for('recherche') }}" class="nav-link">
-                <i class="fas fa-search"></i> Recherche
-            </a>
-            {% if current_user.role == 'admin' %}
-            <a href="{{ url_for('utilisateurs') }}" class="nav-link">
-                <i class="fas fa-users-cog"></i> Utilisateurs
-            </a>
-            {% endif %}
         </nav>
 
         <main class="main-content">
-            <!-- Cartes de statistiques -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%);">
+                    <div class="stat-icon" style="background: #3498DB;">
                         <i class="fas fa-building"></i>
                     </div>
                     <div class="stat-content">
                         <h3>{{ stats.total_clients }}</h3>
-                        <p>Clients</p>
+                        <p>Clients Total</p>
                     </div>
                 </div>
-                
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3>{{ stats.total_employes }}</h3>
-                        <p>Employés</p>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">
+                    <div class="stat-icon" style="background: #2ecc71;">
                         <i class="fas fa-file-invoice"></i>
                     </div>
                     <div class="stat-content">
                         <h3>{{ stats.total_factures }}</h3>
-                        <p>Factures</p>
+                        <p>Factures émises</p>
                     </div>
                 </div>
-                
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
-                        <i class="fas fa-clock"></i>
+                    <div class="stat-icon" style="background: #9b59b6;">
+                        <i class="fas fa-euro-sign"></i>
                     </div>
                     <div class="stat-content">
-                        <h3>{{ stats.factures_en_attente }}</h3>
-                        <p>En attente</p>
+                        <h3>{{ "%.2f"|format(stats.total_ca) }} €</h3>
+                        <p>Chiffre d'affaires</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Actions rapides -->
-            <div class="quick-actions-grid">
-                <div class="section-card">
-                    <h2><i class="fas fa-bolt"></i> Actions Rapides</h2>
-                    <div class="actions-grid">
-                        <a href="{{ url_for('nouvelle_facture_client') }}" class="action-card">
-                            <div class="action-icon" style="background: #3498DB;">
-                                <i class="fas fa-file-invoice-dollar"></i>
-                            </div>
-                            <div class="action-content">
-                                <h3>Nouvelle Facture Client</h3>
-                                <p>Créer une facture pour un client</p>
-                            </div>
-                        </a>
-                        
-                        <a href="{{ url_for('nouvelle_facture_employe') }}" class="action-card">
-                            <div class="action-icon" style="background: #2ecc71;">
-                                <i class="fas fa-user-tie"></i>
-                            </div>
-                            <div class="action-content">
-                                <h3>Nouvelle Facture Employé</h3>
-                                <p>Créer un bulletin de salaire</p>
-                            </div>
-                        </a>
-                        
-                        <a href="{{ url_for('employes') }}" class="action-card">
-                            <div class="action-icon" style="background: #9b59b6;">
-                                <i class="fas fa-user-plus"></i>
-                            </div>
-                            <div class="action-content">
-                                <h3>Ajouter un Employé</h3>
-                                <p>Enregistrer un nouvel employé</p>
-                            </div>
-                        </a>
-                        
-                        <a href="{{ url_for('clients') }}" class="action-card">
-                            <div class="action-icon" style="background: #e74c3c;">
-                                <i class="fas fa-building"></i>
-                            </div>
-                            <div class="action-content">
-                                <h3>Ajouter un Client</h3>
-                                <p>Enregistrer un nouveau client</p>
-                            </div>
-                        </a>
+            <div class="form-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-list"></i> Liste des clients</h2>
+                    <div class="header-actions">
+                        <button class="btn-add" onclick="ouvrirModalClient()">
+                            <i class="fas fa-plus"></i> Nouveau Client
+                        </button>
                     </div>
                 </div>
 
-                <!-- Aperçu des amendes en attente -->
-                <div class="section-card">
-                    <h2><i class="fas fa-exclamation-triangle"></i> Amendes en Attente</h2>
-                    <div class="amendes-list">
-                        {% set amendes_en_attente = [] %}
-                        {% for employe in employes %}
-                            {% set amendes = employe.amendes|selectattr('statut', 'equalto', 'en_attente')|list %}
-                            {% if amendes %}
-                                {% for amende in amendes %}
-                                    {% set _ = amendes_en_attente.append(amende) %}
-                                {% endfor %}
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if amendes_en_attente %}
-                            <div class="table-responsive">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Employé</th>
-                                            <th>Raison</th>
-                                            <th>Montant</th>
-                                            <th>Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for amende in amendes_en_attente[:5] %}
-                                        <tr>
-                                            <td>{{ amende.employe.nom_complet() if amende.employe else 'N/A' }}</td>
-                                            <td>{{ amende.raison[:30] }}...</td>
-                                            <td class="text-danger">-{{ amende.montant }} €</td>
-                                            <td>{{ amende.date_amende.strftime('%d/%m/%Y') }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {% if amendes_en_attente|length > 5 %}
-                            <div class="text-center mt-3">
-                                <a href="{{ url_for('employes') }}" class="btn-secondary">
-                                    Voir toutes ({{ amendes_en_attente|length }})
-                                </a>
-                            </div>
-                            {% endif %}
-                        {% else %}
-                            <div class="empty-state-small">
-                                <i class="fas fa-check-circle fa-3x"></i>
-                                <p>Aucune amende en attente</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Instructions -->
-            <div class="section-card">
-                <h2><i class="fas fa-info-circle"></i> Comment ça marche</h2>
-                <div class="instructions-grid">
-                    <div class="instruction-step">
-                        <div class="step-number">1</div>
-                        <h3>Facture Client</h3>
-                        <p>Créez une facture pour vos clients (grandes entreprises) en incluant tous les services rendus.</p>
-                    </div>
-                    
-                    <div class="instruction-step">
-                        <div class="step-number">2</div>
-                        <h3>Gestion des Amendes</h3>
-                        <p>Enregistrez les amendes de chaque employé pour les problèmes rencontrés lors des missions.</p>
-                    </div>
-                    
-                    <div class="instruction-step">
-                        <div class="step-number">3</div>
-                        <h3>Facture Employé</h3>
-                        <p>Générez le bulletin de salaire en déduisant automatiquement les amendes applicables.</p>
-                    </div>
-                    
-                    <div class="instruction-step">
-                        <div class="step-number">4</div>
-                        <h3>Paiement Net</h3>
-                        <p>Payez vos employés avec le montant net après déduction de toutes les amendes.</p>
-                    </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nom de l'entreprise</th>
+                                <th>Ville</th>
+                                <th>Contact</th>
+                                <th>SIRET</th>
+                                <th>Nb Factures</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in clients %}
+                            <tr id="client-row-{{ client.id }}">
+                                <td><strong>{{ client.nom }}</strong></td>
+                                <td>{{ client.ville }}</td>
+                                <td>
+                                    {% if client.email %}<i class="fas fa-envelope"></i> {{ client.email }}<br>{% endif %}
+                                    {% if client.telephone %}<i class="fas fa-phone"></i> {{ client.telephone }}{% endif %}
+                                </td>
+                                <td>{{ client.siret }}</td>
+                                <td>
+                                    <span class="badge badge-info">{{ client.factures|length }} factures</span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action" title="Modifier" 
+                                                onclick='editerClient({{ client.to_dict()|tojson }})'>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        
+                                        <button class="btn-action btn-danger" title="Supprimer" 
+                                                onclick="supprimerClient({{ client.id }}, '{{ client.nom }}', {{ client.factures|length }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="empty-state-small">Aucun client enregistré.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </main>
 
         <footer class="footer">
-            <p>&copy; {{ now.year }} {{ entreprise.nom }} - Système de facturation avec gestion des amendes</p>
-            <p>Dernière mise à jour : {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
         </footer>
     </div>
 
+    <div id="modalClient" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-building"></i> <span id="modalTitle">Nouveau Client</span></h3>
+                <button class="btn-close" onclick="fermerModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formClient">
+                    <input type="hidden" id="client_id">
+                    
+                    <div class="form-group">
+                        <label for="nom">Nom de l'entreprise *</label>
+                        <input type="text" id="nom" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ville">Ville</label>
+                            <input type="text" id="ville" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="adresse">Adresse</label>
+                            <input type="text" id="adresse" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="telephone">Téléphone</label>
+                            <input type="text" id="telephone" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="siret">Numéro SIRET</label>
+                        <input type="text" id="siret" class="form-control">
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModal()">Annuler</button>
+                <button class="btn-primary" onclick="sauvegarderClient()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GESTION DE LA MODALE ---
+        function ouvrirModalClient() {
+            document.getElementById('modalTitle').textContent = 'Nouveau Client';
+            document.getElementById('formClient').reset();
+            document.getElementById('client_id').value = '';
+            document.getElementById('modalClient').style.display = 'block';
+        }
+
+        function editerClient(client) {
+            document.getElementById('modalTitle').textContent = 'Modifier Client';
+            document.getElementById('client_id').value = client.id;
+            document.getElementById('nom').value = client.nom;
+            document.getElementById('ville').value = client.ville || '';
+            document.getElementById('adresse').value = client.adresse || '';
+            document.getElementById('email').value = client.email || '';
+            document.getElementById('telephone').value = client.telephone || '';
+            document.getElementById('siret').value = client.siret || '';
+            
+            document.getElementById('modalClient').style.display = 'block';
+        }
+
+        function fermerModal() {
+            document.getElementById('modalClient').style.display = 'none';
+        }
+
+        // --- SAUVEGARDER (Création ou Modif) ---
+        async function sauvegarderClient() {
+            const id = document.getElementById('client_id').value;
+            const nom = document.getElementById('nom').value;
+            
+            if(!nom) { alert("Le nom est obligatoire"); return; }
+
+            const data = {
+                nom: nom,
+                ville: document.getElementById('ville').value,
+                adresse: document.getElementById('adresse').value,
+                email: document.getElementById('email').value,
+                telephone: document.getElementById('telephone').value,
+                siret: document.getElementById('siret').value
+            };
+
+            const url = id ? `/api/clients/${id}` : '/api/clients';
+            const method = id ? 'PUT' : 'POST';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert('Client enregistré avec succès !');
+                    location.reload(); // Recharge la page pour voir les changements
+                } else {
+                    alert('Erreur lors de l\'enregistrement.');
+                }
+            } catch (e) {
+                alert('Erreur de connexion.');
+            }
+        }
+
+        // --- SUPPRIMER ---
+        async function supprimerClient(id, nom, nbFactures) {
+            if (nbFactures > 0) {
+                alert(`Impossible de supprimer ${nom} car il possède ${nbFactures} factures. Supprimez d'abord ses factures.`);
+                return;
+            }
+
+            if (!confirm(`Voulez-vous vraiment supprimer le client "${nom}" ?`)) return;
+
+            try {
+                const response = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    document.getElementById(`client-row-${id}`).remove();
+                    alert('Client supprimé.');
+                } else {
+                    alert('Erreur lors de la suppression.');
+                }
+            } catch (e) {
+                alert('Erreur de connexion.');
+            }
+        }
+
+        // Fermer si on clique dehors
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('modalClient')) {
+                fermerModal();
+            }
+        }
+    </script>
+    
     <style>
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-        
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 25px;
-        }
-        
-        .logo-large {
-            height: 100px;
-            width: auto;
-            border-radius: 12px;
-            border: 4px solid white;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .logo-text h1 {
-            margin: 0;
-            font-size: 32px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .subtitle {
-            color: #BDC3C7;
-            font-size: 16px;
-            margin-top: 8px;
-        }
-        
-        .entreprise-info h3 {
-            margin: 0 0 10px 0;
-            font-size: 20px;
-        }
-        
-        .entreprise-info p {
-            margin: 5px 0;
-            font-size: 14px;
-            color: #ECF0F1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .main-nav {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-        
-        .nav-link {
-            flex: 1;
-            min-width: 150px;
-            background: white;
-            padding: 18px 25px;
-            border-radius: 12px;
-            text-decoration: none;
-            color: #2C3E50;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-        
-        .nav-link:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            color: #3498DB;
-        }
-        
-        .nav-link.active {
-            background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%);
-            color: white;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            display: flex;
-            align-items: center;
-            gap: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
-        }
-        
-        .stat-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 32px;
-        }
-        
-        .stat-content h3 {
-            font-size: 42px;
-            margin: 0;
-            color: #2C3E50;
-            font-weight: 700;
-        }
-        
-        .stat-content p {
-            color: #7f8c8d;
-            font-size: 16px;
-            margin: 5px 0 0 0;
-        }
-        
-        .quick-actions-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-        
-        @media (max-width: 1024px) {
-            .quick-actions-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        .section-card {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-        }
-        
-        .section-card h2 {
-            color: #2C3E50;
-            margin: 0 0 25px 0;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
-        
-        .action-card {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 25px;
-            text-decoration: none;
-            color: #2C3E50;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            transition: all 0.3s;
-            border: 2px solid transparent;
-        }
-        
-        .action-card:hover {
-            background: white;
-            border-color: #3498DB;
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.15);
-        }
-        
-        .action-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-        }
-        
-        .action-content h3 {
-            margin: 0 0 8px 0;
-            font-size: 18px;
-        }
-        
-        .action-content p {
-            margin: 0;
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-        
-        .amendes-list {
-            margin-top: 20px;
-        }
-        
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .data-table th {
-            background: #f8f9fa;
-            padding: 15px;
-            text-align: left;
-            color: #2C3E50;
-            font-weight: 600;
-            border-bottom: 2px solid #e0e0e0;
-        }
-        
-        .data-table td {
-            padding: 15px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .data-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-        
-        .text-danger {
-            color: #e74c3c;
-            font-weight: 600;
-        }
-        
-        .empty-state-small {
-            text-align: center;
-            padding: 40px 20px;
-            color: #7f8c8d;
-        }
-        
-        .empty-state-small i {
-            margin-bottom: 15px;
-            color: #2ecc71;
-        }
-        
-        .btn-secondary {
-            background: #95a5a6;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s;
-            font-weight: 600;
-        }
-        
-        .btn-secondary:hover {
-            background: #7f8c8d;
-            transform: translateY(-2px);
-        }
-        
-        .instructions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            margin-top: 20px;
-        }
-        
-        .instruction-step {
-            text-align: center;
-            padding: 25px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            position: relative;
-        }
-        
-        .step-number {
-            position: absolute;
-            top: -15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%);
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
-        }
-        
-        .instruction-step h3 {
-            color: #2C3E50;
-            margin: 15px 0 10px 0;
-            font-size: 18px;
-        }
-        
-        .instruction-step p {
-            color: #7f8c8d;
-            font-size: 14px;
-            line-height: 1.5;
-            margin: 0;
-        }
-        
-        .footer {
-            text-align: center;
-            margin-top: 50px;
-            padding: 25px;
-            color: #7f8c8d;
-            border-top: 2px solid #f0f0f0;
-        }
-        
-        .footer p {
-            margin: 5px 0;
-        }
-        
-        .text-center {
-            text-align: center;
-        }
-        
-        .mt-3 {
-            margin-top: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                text-align: center;
-                gap: 20px;
-            }
-            
-            .logo-section {
-                flex-direction: column;
-            }
-            
-            .main-nav {
-                flex-direction: column;
-            }
-            
-            .stat-card {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .actions-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* Styles pour l'authentification */
-        .user-section {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #ecf0f1;
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #2C3E50;
-            font-size: 14px;
-        }
-        
-        .user-info i {
-            font-size: 20px;
-            color: #3498DB;
-        }
-        
-        .role-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-left: 5px;
-        }
-        
-        .role-badge.admin {
-            background: #e74c3c;
-            color: white;
-        }
-        
-        .role-badge.comptable {
-            background: #f39c12;
-            color: white;
-        }
-        
-        .role-badge.employe {
-            background: #3498DB;
-            color: white;
-        }
-        
-        .btn-logout {
-            padding: 8px 16px;
-            background: #e74c3c;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .btn-logout:hover {
-            background: #c0392b;
-            transform: translateY(-2px);
-        }
+        /* Styles spécifiques pour le bouton danger */
+        .btn-danger { color: #e74c3c !important; }
+        .btn-danger:hover { background: #e74c3c !important; color: white !important; }
     </style>
 </body>
 </html>
