@@ -4371,6 +4371,6 @@ def init_database():
 
 # Initialiser la base de données au démarrage
 init_database()
-    
-    # Ceci est la dernière ligne, elle DOIT être atteinte pour lancer le serveur
-    app.run(debug=True, host='0.0.0.0', port=5000)
+
+# Ceci est la dernière ligne, elle DOIT être atteinte pour lancer le serveur
+app.run(debug=True, host='0.0.0.0', port=5000)
