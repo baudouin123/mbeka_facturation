@@ -30,6 +30,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+# Création automatique des dossiers nécessaires
+os.makedirs('factures', exist_ok=True)
+os.makedirs('static/images', exist_ok=True)
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M"):
@@ -992,7 +995,7 @@ TAUX_TVA = 21.0
 # ============================================================================
 
 def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
-    """Génère un PDF de facture avec un design moderne et professionnel"""
+    """Génère un PDF de facture avec un design moderne et professionnel - VERSION CORRIGÉE"""
     c = canvas.Canvas(chemin_pdf, pagesize=A4)
     width, height = A4
     
@@ -1306,9 +1309,25 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     
     c.save()
 
-    return total_brut, total_tva, total_ttc
-    #else:
-    #return total_brut, total_amendes, total_net
+    # === CORRECTION CRITIQUE : RETOUR COHÉRENT ===
+    # Récupération des totaux
+    total_brut_calc = data.get('total_brut', 0)
+    
+    if type_facture == 'client':
+        # Facture client
+        appliquer_tva = data.get('appliquer_tva', True)
+        if appliquer_tva:
+            total_tva_calc = total_brut_calc * (TAUX_TVA / 100)
+            total_ttc_calc = total_brut_calc + total_tva_calc
+        else:
+            total_tva_calc = 0
+            total_ttc_calc = total_brut_calc
+        return total_brut_calc, total_tva_calc, total_ttc_calc
+    else:
+        # Bulletin employé
+        total_amendes_calc = data.get('total_amendes', 0)
+        total_net_calc = total_brut_calc - total_amendes_calc
+        return total_brut_calc, total_amendes_calc, total_net_calc
     
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
