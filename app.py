@@ -4369,8 +4369,9 @@ def init_database():
         except Exception as e:
             print(f"❌ Erreur lors de l'initialisation de la base de données: {e}")
 
-# Initialiser la base de données au démarrage
+# Initialiser la base de données au démarrage (important pour Render)
 init_database()
 
-# Ceci est la dernière ligne, elle DOIT être atteinte pour lancer le serveur
-app.run(debug=True, host='0.0.0.0', port=5000)
+# ✅ CORRECTION ICI : Le serveur ne se lance que si on exécute "python app.py" manuellement
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
