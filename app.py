@@ -4061,6 +4061,15 @@ def auto_backup():
             app.logger.info(f"✅ Sauvegarde automatique créée : {backup_filename}")
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
+        
+        @app.route('/health', methods=['GET'])
+def health_check():
+    """Route de vérification de santé pour Render"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'Mbeka Facturation',
+        'timestamp': datetime.now().isoformat()
+    })
 
 if __name__ == '__main__':
     # ============================================================================
@@ -4173,9 +4182,16 @@ def init_database():
             print(f"❌ Erreur lors de l'initialisation de la base de données: {e}")
 
 # Initialiser la base de données au démarrage (important pour Render)
+# init_database()
+print("🔄 Initialisation de la base de données...")
 init_database()
+print("✅ Base de données initialisée")
 
-# ✅ CORRECTION ICI : Le serveur ne se lance que si on exécute "python app.py" manuellement
+
+# Si on exécute le fichier directement (python app.py)
 if __name__ == '__main__':
+    print("🚀 Démarrage local du serveur...")
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=port)
+else:
+    print("✅ Application prête pour gunicorn (Render)")
