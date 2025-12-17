@@ -4172,4 +4172,5 @@ init_database()
 
 # ✅ CORRECTION ICI : Le serveur ne se lance que si on exécute "python app.py" manuellement
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=5000)
