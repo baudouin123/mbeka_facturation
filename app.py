@@ -1942,8 +1942,14 @@ def generer_facture_employe():
         # Créer le dossier si nécessaire
         os.makedirs('factures', exist_ok=True)
         
-        # Générer le PDF
-        generer_pdf_facture(pdf_data, chemin_pdf, 'employe')
+        # ==================== CORRECTION ICI ====================
+        # CORRECTION : Appeler avec 2 arguments au lieu de 3
+        pdf_buffer, brut, amendes_calculees, net = generer_pdf_facture(pdf_data, 'employe')
+        
+        # Sauvegarder le PDF dans le fichier
+        with open(chemin_pdf, 'wb') as f:
+            f.write(pdf_buffer.getvalue())
+        # ==================== FIN CORRECTION ====================
         
         # Sauvegarder la facture en base de données
         facture = Facture(
@@ -1984,7 +1990,6 @@ def generer_facture_employe():
         db.session.rollback()
         app.logger.error(f"Erreur génération bulletin: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
-
 # ============================================================================
 # ROUTES POUR LES EMPLOYÉS
 # ============================================================================
