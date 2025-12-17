@@ -1001,12 +1001,12 @@ TAUX_TVA = 21.0
 # ============================================================================
 
 def generer_pdf_facture(data, type_facture='client'):
-    """VERSION FINALE : Design Original (Bleu/Vert) + Adresse + Colonnes complètes"""
+    """VERSION CORRIGÉE : Gère Clients ET Employés + Adresses + Colonnes"""
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # --- TES COULEURS ORIGINALES ---
+    # --- COULEURS ---
     BLEU_FONCE = colors.HexColor("#1e3a8a")
     BLEU_CLAIR = colors.HexColor("#3b82f6")
     GRIS_CLAIR = colors.HexColor("#f3f4f6")
@@ -1018,21 +1018,16 @@ def generer_pdf_facture(data, type_facture='client'):
     
     y = height - 1.5*cm
 
-    # --- LOGO (Méthode Flask qui marche) ---
+    # --- LOGO (Correction Import) ---
     try:
-        # On utilise current_app pour trouver le bon dossier sur Render
-        root_path = current_app.root_path
-        logo_path = os.path.join(root_path, 'static', 'images', 'logo.png')
-        
+        # Utilisation de 'app' directement car défini globalement
+        logo_path = os.path.join(app.root_path, 'static', 'images', 'logo.png')
         if os.path.exists(logo_path):
-            # Affichage du logo
             c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
-        else:
-            print("Logo non trouvé (on continue sans)")
-    except Exception:
-        pass # On ignore les erreurs de logo pour éviter le crash 502
+    except Exception as e:
+        print(f"Logo warning: {e}") 
 
-    # --- INFOS ENTREPRISE (Texte blanc) ---
+    # --- INFOS ENTREPRISE (Haut Droit) ---
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 12)
     c.drawRightString(width - 1.5*cm, y, "MBEKA LOGISTIQUE")
@@ -1043,17 +1038,17 @@ def generer_pdf_facture(data, type_facture='client'):
     y -= 0.4*cm
     c.drawRightString(width - 1.5*cm, y, "contact@mbeka-logistique.com")
     
-    # --- TITRE ---
+    # --- TITRE PRINCIPAL ---
     y = height - 5*cm
     c.setFillColor(BLEU_CLAIR)
     c.roundRect(1.5*cm, y - 1.2*cm, 8*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
     
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
-    titre = "FACTURE" if type_facture == 'client' else "BULLETIN"
-    c.drawString(2*cm, y - 0.9*cm, titre)
+    titre_doc = "FACTURE" if type_facture == 'client' else "BULLETIN DE PAIE"
+    c.drawString(2*cm, y - 0.9*cm, titre_doc)
     
-    # --- CADRES INFOS & CLIENT ---
+    # --- CADRES INFOS & DESTINATAIRE ---
     y -= 2*cm
     
     # Infos (Gauche)
@@ -1067,25 +1062,37 @@ def generer_pdf_facture(data, type_facture='client'):
     c.drawString(2*cm, y - 1.2*cm, f"N° : {data.get('numero_facture', '')}")
     c.drawString(2*cm, y - 1.7*cm, f"Date : {data.get('date_facture', '')}")
     
-    # Client (Droite) - CORRIGÉ AVEC ADRESSE
+    # Destinataire (Droite)
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(width/2 + 0.5*cm, y - 0.6*cm, "CLIENT")
+    
+    # Label dynamique (CLIENT ou EMPLOYÉ)
+    label_dest = "CLIENT" if type_facture == 'client' else "EMPLOYÉ"
+    c.drawString(width/2 + 0.5*cm, y - 0.6*cm, label_dest)
+    
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, str(data.get('destinataire_nom', 'Client')))
+    # Nom du destinataire
+    nom_dest = str(data.get('destinataire_nom', ''))
+    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, nom_dest)
     
-    # --- AJOUT ADRESSE ---
+    # Adresse (Seulement si présente, ex: pour les clients)
     c.setFont("Helvetica", 9)
-    adresse = data.get('destinataire_adresse', '')
-    ville = data.get('destinataire_ville', '')
+    adresse = data.get('destinataire_adresse')
+    ville = data.get('destinataire_ville')
     
+    offset_y = 1.7
     if adresse:
-        c.drawString(width/2 + 0.5*cm, y - 1.7*cm, str(adresse))
+        c.drawString(width/2 + 0.5*cm, y - offset_y*cm, str(adresse))
+        offset_y += 0.4
     if ville:
-        c.drawString(width/2 + 0.5*cm, y - 2.1*cm, str(ville))
+        c.drawString(width/2 + 0.5*cm, y - offset_y*cm, str(ville))
+    
+    # Pour les employés, on peut afficher le matricule si pas d'adresse
+    if type_facture == 'employe' and data.get('matricule'):
+        c.drawString(width/2 + 0.5*cm, y - 1.7*cm, f"Matricule: {data.get('matricule')}")
     
     # --- TABLEAU DES ARTICLES ---
     y -= 3.5*cm
@@ -1095,10 +1102,11 @@ def generer_pdf_facture(data, type_facture='client'):
     c.roundRect(1.5*cm, y - 0.8*cm, width - 3*cm, 0.8*cm, 0.2*cm, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 9)
-    # --- COLONNES AJOUTÉES ---
+    
+    # Colonnes
     c.drawString(2*cm, y - 0.55*cm, "DESCRIPTION")
     c.drawRightString(width - 8*cm, y - 0.55*cm, "QTÉ")
-    c.drawRightString(width - 5*cm, y - 0.55*cm, "PRIX HT")
+    c.drawRightString(width - 5*cm, y - 0.55*cm, "PRIX UNIT.")
     c.drawRightString(width - 2*cm, y - 0.55*cm, "TOTAL")
     
     y -= 1.1*cm
@@ -1109,61 +1117,76 @@ def generer_pdf_facture(data, type_facture='client'):
     ligne_index = 0
     
     for detail in data.get('details', []):
-        # Lignes alternées (Gris / Blanc)
+        # Fond alterné
         if ligne_index % 2 == 0:
             c.setFillColor(colors.HexColor("#f9fafb"))
             c.rect(1.5*cm, y - 0.5*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
         
         c.setFillColor(colors.black)
+        
         desc = detail.get('description', '')
-        # --- VALEURS AJOUTÉES ---
         qte = detail.get('quantite', 0)
-        prix = detail.get('prix_ht', 0)
+        
+        # Astuce: On cherche 'prix_ht' (Client) OU 'prix_unitaire' (Employé)
+        # Si aucun des deux, on met 0
+        prix = detail.get('prix_ht')
+        if prix is None:
+            prix = detail.get('prix_unitaire', 0)
+        
         try: montant = float(detail.get('total', 0))
         except: montant = 0.0
             
-        c.drawString(2*cm, y, desc[:45]) # Limite la longueur du texte
-        c.drawRightString(width - 8*cm, y, str(qte))
+        # Affichage
+        c.drawString(2*cm, y, desc[:45])
+        c.drawRightString(width - 8*cm, y, f"{float(qte):.2f}")
         c.drawRightString(width - 5*cm, y, f"{float(prix):.2f} €")
         c.drawRightString(width - 2*cm, y, f"{montant:.2f} €")
         
         y -= 0.7*cm
         ligne_index += 1
         
+        # Nouvelle page si on arrive en bas
         if y < 4*cm:
             c.showPage()
+            # Redessiner le bandeau en cas de nouvelle page ? (Optionnel, ici on simplifie)
             y = height - 2*cm
 
     # --- TOTAUX ---
     y -= 0.5*cm
     appliquer_tva = data.get('appliquer_tva', False)
     
+    # Calculs finaux
     if appliquer_tva:
-        tva = total_brut * 0.20
+        tva = total_brut * 0.20 # TVA 20%
         ttc = total_brut + tva
-        # Cadre TTC Vert
-        c.setFillColor(VERT)
-        c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
-        c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 12)
-        c.drawRightString(width - 4*cm, y - 2.2*cm, "NET À PAYER:")
-        c.drawRightString(width - 1.5*cm, y - 2.2*cm, f"{ttc:.2f} €")
-        valeur_finale = ttc
-        valeur_tva = tva
+        label_final = "NET À PAYER:"
+        val_final = ttc
     else:
-        # Sans TVA
-        c.setFillColor(VERT)
-        c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
-        c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 12)
-        c.drawRightString(width - 4*cm, y - 0.7*cm, "NET À PAYER:")
-        c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
-        valeur_finale = total_brut
-        valeur_tva = 0
+        # Cas Employé (pas de TVA, mais peut avoir des amendes)
+        total_amendes = float(data.get('total_amendes', 0))
+        if total_amendes > 0:
+            # Afficher les amendes
+            c.setFillColor(colors.red)
+            c.drawRightString(width - 4*cm, y - 0.7*cm, "AMENDES:")
+            c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"- {total_amendes:.2f} €")
+            y -= 0.7*cm
+            
+        val_final = total_brut - total_amendes if type_facture == 'employe' else total_brut
+        label_final = "NET À PAYER:"
+
+    # Cadre Vert du Total
+    c.setFillColor(VERT)
+    c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawRightString(width - 4*cm, y - 0.9*cm, label_final)
+    c.drawRightString(width - 1.5*cm, y - 0.9*cm, f"{val_final:.2f} €")
 
     c.save()
     buffer.seek(0)
-    return buffer, total_brut, valeur_tva, valeur_finale
+    
+    # Retourne 4 valeurs comme attendu par le reste du code
+    return buffer, total_brut, (val_final - total_brut if appliquer_tva else 0), val_final
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
 # ============================================================================
@@ -1745,31 +1768,41 @@ def generer_facture_client():
     try:
         # 1. Récupération des données
         data = request.form
-        client = Client.query.get(int(data.get('client_id')))
+        client_id = data.get('client_id')
+        
+        # Vérification ID valide
+        if not client_id:
+            return jsonify({'error': "ID Client manquant"}), 400
+            
+        client = Client.query.get(int(client_id))
         if not client: return jsonify({'error': "Client introuvable"}), 404
 
         # 2. Construction de la liste des articles
         details = []
         total_brut = 0
         index = 1
-        # On boucle jusqu'à 50 articles max pour éviter les boucles infinies
         while index < 50:
             if f'details[{index}][description]' not in data: break
             try:
-                qte = float(data.get(f'details[{index}][quantite]', 0))
-                prix = float(data.get(f'details[{index}][prix_ht]', 0))
+                # Utilisation sécurisée de get avec valeur par défaut 0
+                qte = float(data.get(f'details[{index}][quantite]') or 0)
+                prix = float(data.get(f'details[{index}][prix_ht]') or 0)
                 total = qte * prix
+                
                 details.append({
                     'description': data[f'details[{index}][description]'],
-                    'quantite': qte, 'prix_ht': prix, 'total': total
+                    'quantite': qte, 
+                    'prix_ht': prix,  # Important: clé utilisée par le PDF
+                    'total': total
                 })
                 total_brut += total
-            except: pass
+            except ValueError: 
+                pass # Ignore les lignes mal formées
             index += 1
             
         if not details: return jsonify({'error': "Ajoutez au moins un article"}), 400
 
-        # 3. Préparation pour le PDF
+        # 3. Préparation données PDF (AVEC ADRESSE)
         numero = data.get('numero_facture', 'TEMP')
         if numero == 'new': numero = generer_numero_facture('client')
         
@@ -1777,34 +1810,38 @@ def generer_facture_client():
             'numero_facture': numero,
             'date_facture': datetime.now().strftime('%d/%m/%Y'),
             'destinataire_nom': client.nom,
-            # --- AJOUT DE L'ADRESSE ICI ---
+            # --- ICI L'AJOUT IMPORTANT ---
             'destinataire_adresse': client.adresse,
             'destinataire_ville': client.ville,
-            # ------------------------------
+            # -----------------------------
             'details': details,
             'total_brut': total_brut,
             'appliquer_tva': data.get('appliquer_tva') == 'on'
         }
 
-        # 4. GÉNÉRATION EN MÉMOIRE (Appel de la fonction Bloc A)
+        # 4. Génération PDF
         pdf_buffer, brut, tva, net = generer_pdf_facture(pdf_data, 'client')
 
-        # 5. Sauvegarde BDD (On stocke le nom virtuel, pas de fichier physique)
+        # 5. Sauvegarde BDD
         nom_fichier = f"Facture_{numero}.pdf"
         facture = Facture(
-            numero=numero, type_facture='client', client_id=client.id,
-            date_facture=datetime.now(), total_brut=brut, total_net=net,
-            fichier_pdf=nom_fichier, details_json=json.dumps(details), statut='en_attente'
+            numero=numero, 
+            type_facture='client', 
+            client_id=client.id,
+            date_facture=datetime.now(), 
+            total_brut=brut, 
+            total_net=net,
+            fichier_pdf=nom_fichier, 
+            details_json=json.dumps(details), 
+            statut='en_attente'
         )
         db.session.add(facture)
         db.session.commit()
 
-        # 6. Envoi du PDF
         return send_file(pdf_buffer, as_attachment=True, download_name=nom_fichier, mimetype='application/pdf')
 
     except Exception as e:
-        # Affiche l'erreur exacte dans Render Logs
-        print(f"ERREUR CRITIQUE: {e}") 
+        print(f"ERREUR GENERATION FACTURE: {e}") 
         return jsonify({'error': f"Erreur serveur: {str(e)}"}), 500
 # ============================================================================
 # ROUTES POUR LES FICHIERS
