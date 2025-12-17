@@ -1001,7 +1001,7 @@ TAUX_TVA = 21.0
 # ============================================================================
 
 def generer_pdf_facture(data, type_facture='client'):
-    """VERSION FINALE : Design Professionnel + Sécurité Render (RAM)"""
+    """VERSION FINALE : Design Professionnel (Bleu/Vert) + Sécurité Render (RAM)"""
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -1014,12 +1014,13 @@ def generer_pdf_facture(data, type_facture='client'):
     VERT = colors.HexColor("#10b981")
     ROUGE = colors.HexColor("#ef4444")
     
-    # --- BANDEAU SUPÉRIEUR ---
+    # --- BANDEAU SUPÉRIEUR (Fond Bleu) ---
     c.setFillColor(BLEU_FONCE)
     c.rect(0, height - 4*cm, width, 4*cm, fill=1, stroke=0)
     
-    # --- LOGO (Méthode Flask Robuste) ---
     y = height - 1.5*cm
+
+    # --- LOGO (Méthode Flask Robuste pour Render) ---
     try:
         # On utilise le chemin racine de l'application Flask
         root_path = current_app.root_path
@@ -1035,6 +1036,7 @@ def generer_pdf_facture(data, type_facture='client'):
         pass # On ne plante pas si le logo échoue
 
     # --- INFOS ENTREPRISE (Texte blanc sur fond bleu) ---
+    # Remplace par tes vraies infos si besoin
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 12)
     c.drawRightString(width - 1.5*cm, y, "MBEKA LOGISTIQUE")
@@ -1047,7 +1049,8 @@ def generer_pdf_facture(data, type_facture='client'):
     
     # --- TITRE "FACTURE" ---
     y = height - 5*cm
-    # Petit trait bleu clair décoratif
+    
+    # Petit cadre bleu clair décoratif autour du titre
     c.setFillColor(BLEU_CLAIR)
     c.roundRect(1.5*cm, y - 1.2*cm, 8*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
     
@@ -1070,7 +1073,7 @@ def generer_pdf_facture(data, type_facture='client'):
     c.drawString(2*cm, y - 1.2*cm, f"N° : {data.get('numero_facture', '')}")
     c.drawString(2*cm, y - 1.7*cm, f"Date : {data.get('date_facture', '')}")
     
-    # --- BLOC CLIENT (Gris) ---
+    # --- BLOC CLIENT (Gris à droite) ---
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
     
@@ -1081,7 +1084,9 @@ def generer_pdf_facture(data, type_facture='client'):
     
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, str(data.get('destinataire_nom', 'Client')))
+    # Récupération sécurisée du nom du client
+    nom_client = str(data.get('destinataire_nom', 'Client'))
+    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, nom_client)
     
     # --- TABLEAU DES ARTICLES ---
     y -= 3.5*cm
@@ -1105,7 +1110,7 @@ def generer_pdf_facture(data, type_facture='client'):
     ligne_index = 0
     
     for detail in data.get('details', []):
-        # Une ligne sur deux en gris très clair (Zebra)
+        # Une ligne sur deux en gris très clair (Zebra striping)
         if ligne_index % 2 == 0:
             c.setFillColor(colors.HexColor("#f9fafb"))
             c.rect(1.5*cm, y - 0.5*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
@@ -1126,7 +1131,12 @@ def generer_pdf_facture(data, type_facture='client'):
         # Gestion nouvelle page si on arrive en bas
         if y < 4*cm:
             c.showPage()
-            y = height - 2*cm
+            # On redessine le bandeau sur la nouvelle page (optionnel)
+            c.setFillColor(BLEU_FONCE)
+            c.rect(0, height - 2*cm, width, 2*cm, fill=1, stroke=0)
+            y = height - 4*cm
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica", 9)
 
     # --- TOTAUX (Bas de page) ---
     y -= 0.5*cm
@@ -1149,7 +1159,7 @@ def generer_pdf_facture(data, type_facture='client'):
         c.drawRightString(width - 4*cm, y - 1.3*cm, "TVA (20%):")
         c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"{tva:.2f} €")
         
-        # Total TTC en vert
+        # Total TTC en vert (Design moderne)
         c.setFillColor(VERT)
         c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
         c.setFillColor(colors.white)
@@ -1171,13 +1181,12 @@ def generer_pdf_facture(data, type_facture='client'):
         valeur_finale = total_brut
         valeur_tva = 0
 
-    # Sauvegarde finale
+    # Sauvegarde finale en mémoire
     c.save()
     buffer.seek(0)
     
     # On renvoie le PDF et les chiffres
     return buffer, total_brut, valeur_tva, valeur_finale
-    
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
 # ============================================================================
