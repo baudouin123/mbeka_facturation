@@ -1001,106 +1001,182 @@ TAUX_TVA = 21.0
 # ============================================================================
 
 def generer_pdf_facture(data, type_facture='client'):
-    """Version Finale : Chemin Flask Absolu + Protection Crash Image"""
+    """VERSION FINALE : Design Professionnel + Sécurité Render (RAM)"""
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # --- COULEURS ---
-    BLEU = colors.HexColor("#1e3a8a")
-    GRIS = colors.HexColor("#f3f4f6")
+    # --- PALETTE DE COULEURS (Ton design original) ---
+    BLEU_FONCE = colors.HexColor("#1e3a8a")
+    BLEU_CLAIR = colors.HexColor("#3b82f6")
+    GRIS_CLAIR = colors.HexColor("#f3f4f6")
+    GRIS_TEXTE = colors.HexColor("#6b7280")
+    VERT = colors.HexColor("#10b981")
+    ROUGE = colors.HexColor("#ef4444")
     
-    # BANDEAU
-    c.setFillColor(BLEU)
-    c.rect(0, height - 3*cm, width, 3*cm, fill=1, stroke=0)
+    # --- BANDEAU SUPÉRIEUR ---
+    c.setFillColor(BLEU_FONCE)
+    c.rect(0, height - 4*cm, width, 4*cm, fill=1, stroke=0)
     
-    # --- GESTION DU LOGO (Méthode Flask Robuste) ---
-    y_logo = height - 2.5*cm
+    # --- LOGO (Méthode Flask Robuste) ---
+    y = height - 1.5*cm
     try:
-        # On utilise le chemin racine de l'application Flask (marche partout : Local & Render)
+        # On utilise le chemin racine de l'application Flask
         root_path = current_app.root_path
         logo_path = os.path.join(root_path, 'static', 'images', 'logo.png')
         
-        # Log pour le débogage (apparaîtra dans tes logs Render)
-        print(f"DEBUG: Tentative chargement logo depuis: {logo_path}")
-        
         if os.path.exists(logo_path):
-            # IMPORTANT : J'ai retiré "mask='auto'" qui fait souvent planter Render
-            c.drawImage(logo_path, 1.5*cm, y_logo, width=4*cm, height=2*cm, preserveAspectRatio=True)
+            # On dessine le logo
+            c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
         else:
-            print("DEBUG: Le fichier logo n'existe pas à cet emplacement.")
+            print("Logo non trouvé (Pas grave, on continue)")
     except Exception as e:
-        print(f"ERREUR LOGO: {str(e)}")
-        # On continue sans le logo, pour ne pas avoir d'erreur 502
-        pass
+        print(f"Erreur logo : {e}")
+        pass # On ne plante pas si le logo échoue
 
-    # --- TEXTES ---
+    # --- INFOS ENTREPRISE (Texte blanc sur fond bleu) ---
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawRightString(width - 1.5*cm, y, "MBEKA LOGISTIQUE")
+    
+    c.setFont("Helvetica", 9)
+    y -= 0.5*cm
+    c.drawRightString(width - 1.5*cm, y, "Transport & Services")
+    y -= 0.4*cm
+    c.drawRightString(width - 1.5*cm, y, "contact@mbeka-logistique.com")
+    
+    # --- TITRE "FACTURE" ---
+    y = height - 5*cm
+    # Petit trait bleu clair décoratif
+    c.setFillColor(BLEU_CLAIR)
+    c.roundRect(1.5*cm, y - 1.2*cm, 8*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
+    
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
-    c.drawRightString(width - 1.5*cm, height - 1.5*cm, "FACTURE")
+    titre = "FACTURE" if type_facture == 'client' else "BULLETIN"
+    c.drawString(2*cm, y - 0.9*cm, titre)
     
-    # Infos
-    y = height - 4.5*cm
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica", 10)
+    # --- BLOC INFOS (Gris) ---
+    y -= 2*cm
+    c.setFillColor(GRIS_CLAIR)
+    c.roundRect(1.5*cm, y - 2.5*cm, 8*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
     
-    # Infos Client
-    c.drawString(2*cm, y, f"Client: {data.get('destinataire_nom', 'Client')}")
-    c.drawRightString(width - 2*cm, y, f"Date: {data.get('date_facture', '')}")
-    c.drawRightString(width - 2*cm, y - 0.5*cm, f"N°: {data.get('numero_facture', '')}")
-    
-    y -= 1.5*cm
-    
-    # --- TABLEAU ---
-    c.setFillColor(GRIS)
-    c.rect(1.5*cm, y-0.2*cm, width-3*cm, 0.8*cm, fill=1, stroke=0)
-    c.setFillColor(colors.black)
+    c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(2*cm, y, "DESCRIPTION")
-    c.drawRightString(width - 2*cm, y, "TOTAL")
-    y -= 0.8*cm
+    c.drawString(2*cm, y - 0.6*cm, "DÉTAILS")
     
-    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 9)
+    c.drawString(2*cm, y - 1.2*cm, f"N° : {data.get('numero_facture', '')}")
+    c.drawString(2*cm, y - 1.7*cm, f"Date : {data.get('date_facture', '')}")
+    
+    # --- BLOC CLIENT (Gris) ---
+    c.setFillColor(GRIS_CLAIR)
+    c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
+    
+    c.setFillColor(BLEU_FONCE)
+    c.setFont("Helvetica-Bold", 10)
+    dest_titre = "CLIENT" if type_facture == 'client' else "EMPLOYÉ"
+    c.drawString(width/2 + 0.5*cm, y - 0.6*cm, dest_titre)
+    
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, str(data.get('destinataire_nom', 'Client')))
+    
+    # --- TABLEAU DES ARTICLES ---
+    y -= 3.5*cm
+    
+    # En-tête du tableau (Bleu foncé)
+    c.setFillColor(BLEU_FONCE)
+    c.roundRect(1.5*cm, y - 0.8*cm, width - 3*cm, 0.8*cm, 0.2*cm, fill=1, stroke=0)
+    
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(2*cm, y - 0.55*cm, "DESCRIPTION")
+    c.drawRightString(width - 2*cm, y - 0.55*cm, "TOTAL")
+    
+    y -= 1.1*cm
+    
+    # Lignes du tableau
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.black)
+    
     total_brut = float(data.get('total_brut', 0))
+    ligne_index = 0
     
-    # Articles
     for detail in data.get('details', []):
-        desc = detail.get('description', '')
-        # Sécurité pour convertir en nombre même si c'est du texte
-        try:
-            mnt = float(detail.get('total', 0))
-        except:
-            mnt = 0.0
-            
-        c.drawString(2*cm, y, desc[:60])
-        c.drawRightString(width - 2*cm, y, f"{mnt:.2f}")
-        y -= 0.6*cm
+        # Une ligne sur deux en gris très clair (Zebra)
+        if ligne_index % 2 == 0:
+            c.setFillColor(colors.HexColor("#f9fafb"))
+            c.rect(1.5*cm, y - 0.5*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
         
-        if y < 3*cm:
+        c.setFillColor(colors.black)
+        desc = detail.get('description', '')
+        try:
+            montant = float(detail.get('total', 0))
+        except:
+            montant = 0.0
+            
+        c.drawString(2*cm, y, desc[:65]) # Coupe si trop long
+        c.drawRightString(width - 2*cm, y, f"{montant:.2f} €")
+        
+        y -= 0.7*cm
+        ligne_index += 1
+        
+        # Gestion nouvelle page si on arrive en bas
+        if y < 4*cm:
             c.showPage()
             y = height - 2*cm
-            
-    # --- TOTAL FINAL ---
-    y -= 1*cm
-    c.setLineWidth(1)
-    c.line(width-7*cm, y+0.5*cm, width-2*cm, y+0.5*cm)
-    c.setFont("Helvetica-Bold", 12)
+
+    # --- TOTAUX (Bas de page) ---
+    y -= 0.5*cm
     
-    if data.get('appliquer_tva'):
+    # Calculs TVA
+    appliquer_tva = data.get('appliquer_tva', False)
+    if appliquer_tva:
         tva = total_brut * 0.20
         ttc = total_brut + tva
-        c.drawRightString(width - 2*cm, y, f"Total TTC: {ttc:.2f} €")
-        # Retourne TTC
-        return_val = ttc
+        
+        # Cadre gris pour les sous-totaux
+        c.setFillColor(GRIS_CLAIR)
+        c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 2.3*cm, 0.3*cm, fill=1, stroke=0)
+        
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 10)
+        c.drawRightString(width - 4*cm, y - 0.7*cm, "Total HT:")
+        c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
+        
+        c.drawRightString(width - 4*cm, y - 1.3*cm, "TVA (20%):")
+        c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"{tva:.2f} €")
+        
+        # Total TTC en vert
+        c.setFillColor(VERT)
+        c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawRightString(width - 4*cm, y - 2.2*cm, "NET À PAYER:")
+        c.drawRightString(width - 1.5*cm, y - 2.2*cm, f"{ttc:.2f} €")
+        
+        valeur_finale = ttc
+        valeur_tva = tva
     else:
-        c.drawRightString(width - 2*cm, y, f"Total: {total_brut:.2f} €")
-        return_val = total_brut
+        # Sans TVA
+        c.setFillColor(VERT)
+        c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawRightString(width - 4*cm, y - 0.7*cm, "NET À PAYER:")
+        c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
+        
+        valeur_finale = total_brut
+        valeur_tva = 0
 
+    # Sauvegarde finale
     c.save()
     buffer.seek(0)
     
-    # On retourne le buffer et les montants
-    return buffer, total_brut, 0, return_val
+    # On renvoie le PDF et les chiffres
+    return buffer, total_brut, valeur_tva, valeur_finale
     
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
