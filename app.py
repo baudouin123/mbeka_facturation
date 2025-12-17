@@ -997,90 +997,106 @@ TAUX_TVA = 21.0
 # ============================================================================
 
 def generer_pdf_facture(data, type_facture='client'):
-    """Génération du PDF directement en mémoire RAM (Compatible Render Starter)"""
+    """Version Finale : Chemin Flask Absolu + Protection Crash Image"""
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # --- DESIGN ET COULEURS ---
-    BLEU_FONCE = colors.HexColor("#1e3a8a")
-    BLEU_CLAIR = colors.HexColor("#3b82f6")
-    GRIS_CLAIR = colors.HexColor("#f3f4f6")
+    # --- COULEURS ---
+    BLEU = colors.HexColor("#1e3a8a")
+    GRIS = colors.HexColor("#f3f4f6")
     
-    # Bandeau haut
-    c.setFillColor(BLEU_FONCE)
-    c.rect(0, height - 4*cm, width, 4*cm, fill=1, stroke=0)
+    # BANDEAU
+    c.setFillColor(BLEU)
+    c.rect(0, height - 3*cm, width, 3*cm, fill=1, stroke=0)
     
-    # Logo (Sécurisé : ne plante pas si l'image est introuvable)
-    y = height - 1.5*cm
+    # --- GESTION DU LOGO (Méthode Flask Robuste) ---
+    y_logo = height - 2.5*cm
     try:
-        basedir = os.path.abspath(os.path.dirname(__file__))
-        logo_path = os.path.join(basedir, 'static', 'images', 'logo.png')
+        # On utilise le chemin racine de l'application Flask (marche partout : Local & Render)
+        root_path = current_app.root_path
+        logo_path = os.path.join(root_path, 'static', 'images', 'logo.png')
+        
+        # Log pour le débogage (apparaîtra dans tes logs Render)
+        print(f"DEBUG: Tentative chargement logo depuis: {logo_path}")
+        
         if os.path.exists(logo_path):
-            c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
-    except: pass
+            # IMPORTANT : J'ai retiré "mask='auto'" qui fait souvent planter Render
+            c.drawImage(logo_path, 1.5*cm, y_logo, width=4*cm, height=2*cm, preserveAspectRatio=True)
+        else:
+            print("DEBUG: Le fichier logo n'existe pas à cet emplacement.")
+    except Exception as e:
+        print(f"ERREUR LOGO: {str(e)}")
+        # On continue sans le logo, pour ne pas avoir d'erreur 502
+        pass
 
-    # Titre
-    y_titre = height - 5*cm
-    c.setFillColor(BLEU_CLAIR)
-    c.roundRect(1.5*cm, y_titre - 1.2*cm, 8*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
+    # --- TEXTES ---
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
-    c.drawString(2*cm, y_titre - 0.9*cm, "FACTURE" if type_facture == 'client' else "BULLETIN")
-
-    # Infos Client
-    y_info = y_titre - 2*cm
+    c.drawRightString(width - 1.5*cm, height - 1.5*cm, "FACTURE")
+    
+    # Infos
+    y = height - 4.5*cm
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 10)
-    c.drawString(2*cm, y_info, f"N°: {data.get('numero_facture', 'PROFORMA')}")
-    c.drawString(2*cm, y_info - 0.5*cm, f"Date: {data.get('date_facture', '')}")
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(width/2, y_info, f"Client: {data.get('destinataire_nom', 'Client')}")
-
-    # Tableau des articles
-    y = y_info - 2.5*cm
-    c.setFont("Helvetica-Bold", 9)
+    
+    # Infos Client
+    c.drawString(2*cm, y, f"Client: {data.get('destinataire_nom', 'Client')}")
+    c.drawRightString(width - 2*cm, y, f"Date: {data.get('date_facture', '')}")
+    c.drawRightString(width - 2*cm, y - 0.5*cm, f"N°: {data.get('numero_facture', '')}")
+    
+    y -= 1.5*cm
+    
+    # --- TABLEAU ---
+    c.setFillColor(GRIS)
+    c.rect(1.5*cm, y-0.2*cm, width-3*cm, 0.8*cm, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 10)
     c.drawString(2*cm, y, "DESCRIPTION")
     c.drawRightString(width - 2*cm, y, "TOTAL")
-    y -= 0.5*cm
+    y -= 0.8*cm
     
+    c.setFont("Helvetica", 10)
     total_brut = float(data.get('total_brut', 0))
-    c.setFont("Helvetica", 9)
     
-    # Boucle sur les détails
+    # Articles
     for detail in data.get('details', []):
         desc = detail.get('description', '')
-        montant = float(detail.get('total', 0))
-        c.drawString(2*cm, y, desc[:60]) # On coupe si trop long
-        c.drawRightString(width - 2*cm, y, f"{montant:.2f} €")
+        # Sécurité pour convertir en nombre même si c'est du texte
+        try:
+            mnt = float(detail.get('total', 0))
+        except:
+            mnt = 0.0
+            
+        c.drawString(2*cm, y, desc[:60])
+        c.drawRightString(width - 2*cm, y, f"{mnt:.2f}")
         y -= 0.6*cm
         
-        # Nouvelle page si on arrive en bas
         if y < 3*cm:
             c.showPage()
             y = height - 2*cm
-
-    # Totaux
+            
+    # --- TOTAL FINAL ---
     y -= 1*cm
+    c.setLineWidth(1)
+    c.line(width-7*cm, y+0.5*cm, width-2*cm, y+0.5*cm)
+    c.setFont("Helvetica-Bold", 12)
+    
     if data.get('appliquer_tva'):
         tva = total_brut * 0.20
         ttc = total_brut + tva
-        c.setFont("Helvetica-Bold", 10)
-        c.drawRightString(width - 2*cm, y, f"Total HT: {total_brut:.2f} €")
-        c.drawRightString(width - 2*cm, y-0.5*cm, f"TVA (20%): {tva:.2f} €")
-        c.setFont("Helvetica-Bold", 14)
-        c.drawRightString(width - 2*cm, y-1.5*cm, f"NET À PAYER: {ttc:.2f} €")
-        total_final = ttc # Pour le retour BDD
-        tva_final = tva
+        c.drawRightString(width - 2*cm, y, f"Total TTC: {ttc:.2f} €")
+        # Retourne TTC
+        return_val = ttc
     else:
-        c.setFont("Helvetica-Bold", 14)
-        c.drawRightString(width - 2*cm, y, f"NET À PAYER: {total_brut:.2f} €")
-        total_final = total_brut
-        tva_final = 0
+        c.drawRightString(width - 2*cm, y, f"Total: {total_brut:.2f} €")
+        return_val = total_brut
 
     c.save()
     buffer.seek(0)
-    return buffer, total_brut, tva_final, total_final
+    
+    # On retourne le buffer et les montants
+    return buffer, total_brut, 0, return_val
     
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
