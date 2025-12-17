@@ -4062,7 +4062,7 @@ def auto_backup():
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
         
-        @app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET'])
 def health_check():
     """Route de vérification de santé pour Render"""
     return jsonify({
