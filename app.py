@@ -27,6 +27,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import zipfile
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
+from weasyprint import HTML
+from flask import render_template
+html = render_template("facture.html", facture=facture)
+HTML(string=html, base_url=app.root_path).write_pdf(pdf_path)
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
