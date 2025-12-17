@@ -1018,14 +1018,19 @@ def generer_pdf_facture(data, type_facture='client'):
     
     y = height - 1.5*cm
 
-    # --- LOGO ---
+    # --- LOGO (Méthode Flask qui marche) ---
     try:
+        # On utilise current_app pour trouver le bon dossier sur Render
         root_path = current_app.root_path
         logo_path = os.path.join(root_path, 'static', 'images', 'logo.png')
+        
         if os.path.exists(logo_path):
+            # Affichage du logo
             c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
+        else:
+            print("Logo non trouvé (on continue sans)")
     except Exception:
-        pass 
+        pass # On ignore les erreurs de logo pour éviter le crash 502
 
     # --- INFOS ENTREPRISE (Texte blanc) ---
     c.setFillColor(colors.white)
@@ -1062,21 +1067,21 @@ def generer_pdf_facture(data, type_facture='client'):
     c.drawString(2*cm, y - 1.2*cm, f"N° : {data.get('numero_facture', '')}")
     c.drawString(2*cm, y - 1.7*cm, f"Date : {data.get('date_facture', '')}")
     
-    # Client (Droite) - CORRIGÉ POUR AFFICHER L'ADRESSE
+    # Client (Droite) - CORRIGÉ AVEC ADRESSE
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
     c.drawString(width/2 + 0.5*cm, y - 0.6*cm, "CLIENT")
-    
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
     c.drawString(width/2 + 0.5*cm, y - 1.2*cm, str(data.get('destinataire_nom', 'Client')))
     
-    # Ajout Adresse et Ville
+    # --- AJOUT ADRESSE ---
     c.setFont("Helvetica", 9)
     adresse = data.get('destinataire_adresse', '')
     ville = data.get('destinataire_ville', '')
+    
     if adresse:
         c.drawString(width/2 + 0.5*cm, y - 1.7*cm, str(adresse))
     if ville:
@@ -1090,8 +1095,7 @@ def generer_pdf_facture(data, type_facture='client'):
     c.roundRect(1.5*cm, y - 0.8*cm, width - 3*cm, 0.8*cm, 0.2*cm, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 9)
-    
-    # Titres des colonnes CORRIGÉS
+    # --- COLONNES AJOUTÉES ---
     c.drawString(2*cm, y - 0.55*cm, "DESCRIPTION")
     c.drawRightString(width - 8*cm, y - 0.55*cm, "QTÉ")
     c.drawRightString(width - 5*cm, y - 0.55*cm, "PRIX HT")
@@ -1111,15 +1115,14 @@ def generer_pdf_facture(data, type_facture='client'):
             c.rect(1.5*cm, y - 0.5*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
         
         c.setFillColor(colors.black)
-        
         desc = detail.get('description', '')
+        # --- VALEURS AJOUTÉES ---
         qte = detail.get('quantite', 0)
         prix = detail.get('prix_ht', 0)
         try: montant = float(detail.get('total', 0))
         except: montant = 0.0
             
-        # Affichage des valeurs CORRIGÉ
-        c.drawString(2*cm, y, desc[:45])
+        c.drawString(2*cm, y, desc[:45]) # Limite la longueur du texte
         c.drawRightString(width - 8*cm, y, str(qte))
         c.drawRightString(width - 5*cm, y, f"{float(prix):.2f} €")
         c.drawRightString(width - 2*cm, y, f"{montant:.2f} €")
@@ -1766,7 +1769,7 @@ def generer_facture_client():
             
         if not details: return jsonify({'error': "Ajoutez au moins un article"}), 400
 
-        # 3. Préparation pour le PDF - CORRIGÉ AVEC ADRESSE
+        # 3. Préparation pour le PDF
         numero = data.get('numero_facture', 'TEMP')
         if numero == 'new': numero = generer_numero_facture('client')
         
@@ -1774,17 +1777,19 @@ def generer_facture_client():
             'numero_facture': numero,
             'date_facture': datetime.now().strftime('%d/%m/%Y'),
             'destinataire_nom': client.nom,
-            'destinataire_adresse': client.adresse,  # <-- C'EST ICI QUE CA MANQUAIT
-            'destinataire_ville': client.ville,      # <-- C'EST ICI QUE CA MANQUAIT
+            # --- AJOUT DE L'ADRESSE ICI ---
+            'destinataire_adresse': client.adresse,
+            'destinataire_ville': client.ville,
+            # ------------------------------
             'details': details,
             'total_brut': total_brut,
             'appliquer_tva': data.get('appliquer_tva') == 'on'
         }
 
-        # 4. GÉNÉRATION EN MÉMOIRE
+        # 4. GÉNÉRATION EN MÉMOIRE (Appel de la fonction Bloc A)
         pdf_buffer, brut, tva, net = generer_pdf_facture(pdf_data, 'client')
 
-        # 5. Sauvegarde BDD
+        # 5. Sauvegarde BDD (On stocke le nom virtuel, pas de fichier physique)
         nom_fichier = f"Facture_{numero}.pdf"
         facture = Facture(
             numero=numero, type_facture='client', client_id=client.id,
@@ -1798,6 +1803,7 @@ def generer_facture_client():
         return send_file(pdf_buffer, as_attachment=True, download_name=nom_fichier, mimetype='application/pdf')
 
     except Exception as e:
+        # Affiche l'erreur exacte dans Render Logs
         print(f"ERREUR CRITIQUE: {e}") 
         return jsonify({'error': f"Erreur serveur: {str(e)}"}), 500
 # ============================================================================
