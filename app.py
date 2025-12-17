@@ -13,11 +13,13 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.units import cm
+from io import BytesIO
 from datetime import datetime, date, timedelta
 import os
 import json
 import shutil
 import glob
+from flask import send_file
 from pathlib import Path
 import csv
 from io import StringIO, BytesIO
@@ -994,9 +996,12 @@ TAUX_TVA = 21.0
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
-def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
-    """Génère un PDF de facture avec un design moderne et professionnel - VERSION CORRIGÉE"""
-    c = canvas.Canvas(chemin_pdf, pagesize=A4)
+def generer_pdf_facture(data, type_facture='client'):
+    """Génère un PDF de facture directement en MÉMOIRE (RAM) pour Render"""
+    
+    # --- 1. Création du buffer en mémoire (plus de fichier disque) ---
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
     # Couleurs modernes
@@ -1013,29 +1018,32 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     
     y = height - 1.5*cm
     
-    # Logo (sur fond bleu)
-    logo_path = os.path.join('static', 'images', 'logo.png')
+    # --- LOGO (Correction du chemin pour Render) ---
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    logo_path = os.path.join(basedir, 'static', 'images', 'logo.png')
+    
     if os.path.exists(logo_path):
         try:
             c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, 
-                       preserveAspectRatio=True, mask='auto')
+                        preserveAspectRatio=True, mask='auto')
         except:
             pass
     
     # Informations entreprise (en blanc sur fond bleu)
+    # Note: On utilise .get() pour éviter les erreurs si VOTRE_ENTREPRISE manque une clé
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 11)
-    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["nom"])
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE.get("nom", "Mon Entreprise"))
     
     c.setFont("Helvetica", 9)
     y -= 0.5*cm
-    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["adresse"])
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE.get("adresse", ""))
     y -= 0.4*cm
-    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["ville"])
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE.get("ville", ""))
     y -= 0.4*cm
-    c.drawRightString(width - 1.5*cm, y, f"Tél: {VOTRE_ENTREPRISE['telephone']}")
+    c.drawRightString(width - 1.5*cm, y, f"Tél: {VOTRE_ENTREPRISE.get('telephone', '')}")
     y -= 0.4*cm
-    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE['email'])
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE.get('email', ''))
     
     # --- TITRE DE LA FACTURE ---
     y = height - 5*cm
@@ -1064,24 +1072,29 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     c.setFillColor(colors.black)
     c.drawString(2*cm, y - 1.1*cm, f"N° Facture:")
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(4*cm, y - 1.1*cm, data['numero_facture'])
+    c.drawString(4*cm, y - 1.1*cm, str(data.get('numero_facture', '')))
     
     c.setFont("Helvetica", 9)
     c.drawString(2*cm, y - 1.6*cm, f"Date:")
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(4*cm, y - 1.6*cm, data['date_facture'])
+    c.drawString(4*cm, y - 1.6*cm, str(data.get('date_facture', '')))
     
     if data.get('date_debut') and data.get('date_fin'):
         try:
-            date_debut_str = data['date_debut']
-            date_fin_str = data['date_fin']
+            date_debut_str = str(data['date_debut'])
+            date_fin_str = str(data['date_fin'])
             
+            # Gestion simple des dates si elles sont déjà formatées ou non
             if '-' in date_debut_str:
-                date_debut = datetime.strptime(date_debut_str, "%Y-%m-%d")
-                date_fin = datetime.strptime(date_fin_str, "%Y-%m-%d")
-                date_debut_str = date_debut.strftime('%d/%m/%Y')
-                date_fin_str = date_fin.strftime('%d/%m/%Y')
-            
+                # Si format YYYY-MM-DD on essaie de convertir
+                try:
+                    d_deb = datetime.strptime(date_debut_str, "%Y-%m-%d")
+                    d_fin = datetime.strptime(date_fin_str, "%Y-%m-%d")
+                    date_debut_str = d_deb.strftime('%d/%m/%Y')
+                    date_fin_str = d_fin.strftime('%d/%m/%Y')
+                except:
+                    pass 
+
             c.setFont("Helvetica", 9)
             c.drawString(2*cm, y - 2.1*cm, f"Période:")
             c.setFont("Helvetica-Bold", 9)
@@ -1100,7 +1113,7 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     
     c.setFont("Helvetica-Bold", 11)
     c.setFillColor(colors.black)
-    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, data['destinataire_nom'])
+    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, data.get('destinataire_nom', ''))
     
     if type_facture == 'client':
         c.setFont("Helvetica", 9)
@@ -1144,8 +1157,8 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     c.setFont("Helvetica", 9)
     c.setFillColor(colors.black)
     
-    total_brut = data.get('total_brut', 0)
-    total_amendes = data.get('total_amendes', 0)
+    total_brut = float(data.get('total_brut', 0))
+    total_amendes = float(data.get('total_amendes', 0))
     
     ligne_index = 0
     
@@ -1164,12 +1177,17 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
                     description = description[:57] + "..."
                 c.drawString(COL_DESC, y - 0.45*cm, description)
                 
-                c.drawRightString(COL_QTY + 1.2*cm, y - 0.45*cm, f"{detail.get('quantite', 1):.2f}")
-                c.drawRightString(COL_PRIX + 1.2*cm, y - 0.45*cm, f"{detail.get('prix_ht', 0):.2f} €")
-                c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"{detail.get('total', 0):.2f} €")
+                c.drawRightString(COL_QTY + 1.2*cm, y - 0.45*cm, f"{float(detail.get('quantite', 1)):.2f}")
+                c.drawRightString(COL_PRIX + 1.2*cm, y - 0.45*cm, f"{float(detail.get('prix_ht', 0)):.2f} €")
+                c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"{float(detail.get('total', 0)):.2f} €")
                 
                 y -= 0.7*cm
                 ligne_index += 1
+                
+                # Gestion saut de page si besoin (basique)
+                if y < 4*cm:
+                    c.showPage()
+                    y = height - 2*cm
     else:
         # Salaire brut
         c.setFillColor(colors.HexColor("#f9fafb"))
@@ -1184,7 +1202,7 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
         for amende in amendes:
             c.setFillColor(ROUGE)
             c.drawString(COL_DESC, y - 0.45*cm, f"- {amende.get('raison', '')[:50]}")
-            c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"-{amende.get('montant', 0):.2f} €")
+            c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"-{float(amende.get('montant', 0)):.2f} €")
             y -= 0.7*cm
     
     # --- TOTAUX (Encadré coloré) ---
@@ -1196,10 +1214,11 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     if type_facture == 'client':
         if appliquer_tva:
             # Avec TVA
-            total_tva = total_brut * (TAUX_TVA / 100)
+            # Utilise TAUX_TVA global ou par défaut 20
+            tva_percent = globals().get('TAUX_TVA', 20)
+            total_tva = total_brut * (tva_percent / 100)
             total_ttc = total_brut + total_tva
             
-            # Fond des totaux
             c.setFillColor(GRIS_CLAIR)
             c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 2.3*cm, 0.3*cm, fill=1, stroke=0)
             
@@ -1208,7 +1227,7 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
             c.drawRightString(width - 4*cm, y - 0.7*cm, "Total HT:")
             c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
             
-            c.drawRightString(width - 4*cm, y - 1.3*cm, f"TVA ({TAUX_TVA}%):")
+            c.drawRightString(width - 4*cm, y - 1.3*cm, f"TVA ({tva_percent}%):")
             c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"{total_tva:.2f} €")
             
             # Total TTC en grand
@@ -1301,33 +1320,24 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     
     c.setFont("Helvetica", 8)
     c.setFillColor(GRIS_TEXTE)
+    
+    # Récupération sécurisée des infos entreprise
+    iban = VOTRE_ENTREPRISE.get('iban', 'IBAN NON DÉFINI')
+    siret = VOTRE_ENTREPRISE.get('siret', '')
+    
     if type_facture == 'client':
-        c.drawCentredString(width/2, 1.2*cm, f"IBAN: {VOTRE_ENTREPRISE['iban']} • SIRET: {VOTRE_ENTREPRISE['siret']}")
+        c.drawCentredString(width/2, 1.2*cm, f"IBAN: {iban} • SIRET: {siret}")
         c.drawCentredString(width/2, 0.7*cm, f"Paiement à 30 jours • Facture émise le {datetime.now().strftime('%d/%m/%Y')}")
     else:
         c.drawCentredString(width/2, 1*cm, f"Document émis le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
     
+    # --- FIN ET SAUVEGARDE EN MÉMOIRE ---
     c.save()
+    buffer.seek(0) # Rembobiner le buffer pour qu'il soit prêt à être lu
 
-    # === CORRECTION CRITIQUE : RETOUR COHÉRENT ===
-    # Récupération des totaux
-    total_brut_calc = data.get('total_brut', 0)
-    
-    if type_facture == 'client':
-        # Facture client
-        appliquer_tva = data.get('appliquer_tva', True)
-        if appliquer_tva:
-            total_tva_calc = total_brut_calc * (TAUX_TVA / 100)
-            total_ttc_calc = total_brut_calc + total_tva_calc
-        else:
-            total_tva_calc = 0
-            total_ttc_calc = total_brut_calc
-        return total_brut_calc, total_tva_calc, total_ttc_calc
-    else:
-        # Bulletin employé
-        total_amendes_calc = data.get('total_amendes', 0)
-        total_net_calc = total_brut_calc - total_amendes_calc
-        return total_brut_calc, total_amendes_calc, total_net_calc
+    # === RETOUR DES DONNÉES ET DU PDF ===
+    # On renvoie le buffer + les calculs pour la BDD
+    return buffer, total_brut, total_tva, total_ttcc
     
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
@@ -1907,12 +1917,12 @@ def nouvelle_facture_employe():
 
 @app.route('/generer-facture-client', methods=['POST'])
 def generer_facture_client():
-    """Génère une facture pour un client - VERSION CORRIGÉE"""
+    """Génère une facture pour un client - VERSION CORRIGÉE POUR RENDER (RAM)"""
     try:
         # Récupérer les données du formulaire
         data = request.form
         
-        # ✅ VALIDATION : Vérifier que client_id est valide
+        # VALIDATION : Vérifier que client_id est valide
         client_id_str = data.get('client_id', '').strip()
         
         if not client_id_str or not client_id_str.isdigit():
@@ -1926,9 +1936,6 @@ def generer_facture_client():
             app.logger.error(f"Client non trouvé: {client_id}")
             return jsonify({'error': "Client non trouvé"}), 404
         
-        # Créer le dossier factures s'il n'existe pas
-        os.makedirs('factures', exist_ok=True)
-        
         # Générer un numéro de facture automatique
         numero_facture = data.get('numero_facture', '').strip()
         if not numero_facture or numero_facture.lower() == 'new':
@@ -1936,7 +1943,7 @@ def generer_facture_client():
         
         app.logger.info(f"Génération facture {numero_facture} pour client {client.nom}")
         
-        # ✅ CORRECTION CRITIQUE : Lecture dynamique de TOUS les articles
+        # Lecture dynamique de TOUS les articles
         total_brut = 0
         details = []
         
@@ -1966,28 +1973,19 @@ def generer_facture_client():
                         'total': total
                     })
                     total_brut += total
-                    
-                    app.logger.info(f"Article {index}: {description} - {quantite} x {prix_ht}€ = {total}€")
-                    
                 except (ValueError, TypeError) as e:
-                    app.logger.warning(f"Erreur article {index}: {e}")
-                    # On continue avec les autres articles
                     pass
             
             index += 1
         
-        # ✅ VALIDATION : Au moins un article
+        # VALIDATION : Au moins un article
         if not details:
-            app.logger.error("Aucun article valide trouvé")
-            return jsonify({'error': "Veuillez ajouter au moins un article valide avec une description"}), 400
+            return jsonify({'error': "Veuillez ajouter au moins un article valide"}), 400
         
-        app.logger.info(f"Total: {len(details)} articles, {total_brut}€ HT")
-        
-        # ✅ RÉCUPÉRER LES NOTES ET RÉCLAMATIONS
+        # RÉCUPÉRER LES NOTES ET RÉCLAMATIONS
         notes = data.get('notes', '').strip()
         reclamation = data.get('reclamation', '').strip()
         
-        # Combiner notes et réclamation pour l'affichage
         notes_completes = ""
         if notes:
             notes_completes += f"NOTES: {notes}"
@@ -1996,7 +1994,7 @@ def generer_facture_client():
                 notes_completes += "\n\n"
             notes_completes += f"RÉCLAMATION: {reclamation}"
         
-        # ✅ Récupérer l'option TVA
+        # Récupérer l'option TVA
         appliquer_tva = data.get('appliquer_tva') == 'on'
         
         # Préparer les données pour le PDF
@@ -2010,22 +2008,19 @@ def generer_facture_client():
             'destinataire_ville': client.ville or '',
             'details': details,
             'total_brut': total_brut,
-            'notes': notes_completes,  # ✅ Notes complètes avec réclamation
-            'appliquer_tva': appliquer_tva  # ✅ Option TVA
+            'notes': notes_completes,
+            'appliquer_tva': appliquer_tva
         }
         
-        # Générer le nom du fichier PDF
+        # Nom virtuel du fichier (pour le téléchargement)
         nom_fichier = f"Facture_{numero_facture.replace('/', '_')}.pdf"
-        chemin_pdf = os.path.join('factures', nom_fichier)
         
-        app.logger.info(f"Génération PDF: {chemin_pdf}")
+        app.logger.info(f"Génération PDF en mémoire...")
         
-        # Générer le PDF
-        total_ht, total_tva, total_ttc = generer_pdf_facture(pdf_data, chemin_pdf, 'client')
+        # --- APPEL CORRIGÉ (Récupère le buffer) ---
+        pdf_buffer, total_ht, total_tva_calc, total_ttc = generer_pdf_facture(pdf_data, type_facture='client')
         
-        app.logger.info(f"PDF généré: HT={total_ht}€, TVA={total_tva}€, TTC={total_ttc}€")
-        
-        # ✅ SAUVEGARDER EN BASE DE DONNÉES
+        # SAUVEGARDER EN BASE DE DONNÉES
         facture = Facture(
             numero=numero_facture,
             type_facture='client',
@@ -2035,20 +2030,20 @@ def generer_facture_client():
             client_id=client.id,
             total_brut=total_brut,
             total_net=total_ttc,
-            fichier_pdf=chemin_pdf,
+            fichier_pdf=nom_fichier, # On stocke juste le nom
             details_json=json.dumps(details, ensure_ascii=False),
-            notes=notes_completes,  # ✅ Sauvegarder les notes complètes
+            notes=notes_completes,
             statut='en_attente'
         )
         
         db.session.add(facture)
         db.session.commit()
         
-        app.logger.info(f"✅ Facture {numero_facture} enregistrée avec succès (ID: {facture.id})")
+        app.logger.info(f"✅ Facture enregistrée en BDD (ID: {facture.id})")
         
-        # Envoyer le fichier PDF
+        # ENVOI DU FICHIER DEPUIS LA RAM
         return send_file(
-            chemin_pdf, 
+            pdf_buffer, 
             as_attachment=True, 
             download_name=nom_fichier,
             mimetype='application/pdf'
@@ -2063,7 +2058,6 @@ def generer_facture_client():
         db.session.rollback()
         app.logger.error(f"Erreur serveur: {str(e)}", exc_info=True)
         return jsonify({'error': f"Erreur lors de la génération: {str(e)}"}), 500
-
 # ============================================================================
 # ROUTES POUR LES FICHIERS
 # ============================================================================
