@@ -77,17 +77,18 @@ app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)  # "Remember me" 7 jo
 
 # ✅ Configuration Base de Données - Support PostgreSQL (Production) et SQLite (Développement)
 if os.environ.get('DATABASE_URL'):
-    # En production sur Render (PostgreSQL)
     database_url = os.environ.get('DATABASE_URL')
-    # Render utilise postgres://, mais SQLAlchemy veut postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    # CORRECTION: Ajouter le paramètre SSL
+    if 'postgresql://' in database_url and '?' not in database_url:
+        database_url += '?sslmode=require'
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print("🔵 Mode PRODUCTION - PostgreSQL activé")
+    print("✅ Mode PRODUCTION - PostgreSQL activé")
 else:
-    # En développement local (SQLite)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
-    print("🟢 Mode DÉVELOPPEMENT - SQLite activé")
+    print("✅ Mode DÉVELOPPEMENT - SQLite activé")
+
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
