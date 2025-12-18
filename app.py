@@ -31,6 +31,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from flask_session import Session
+
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M"):
@@ -43,35 +44,55 @@ def parse_date(value):
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 
-
 app = Flask(__name__)
 app.config['WTF_CSRF_CHECK_DEFAULT'] = False
 
 # ✅ AJOUT : Clé secrète pour la sécurité
-app.config['SECRET_KEY'] = 'mbeka-facturation-secure-key-2024-december-14'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mbeka-facturation-secure-key-2024-december-14')
+
+# ============================================================================
+# CONFIGURATION DE LA BASE DE DONNÉES - MODIFIÉ POUR RENDER
+# ============================================================================
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Production sur Render : PostgreSQL
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    print("🚀 Mode PRODUCTION : PostgreSQL activé")
+else:
+    # Développement local : SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
+    print("💻 Mode DÉVELOPPEMENT : SQLite activé")
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
+# ============================================================================
 
 # ✅ AJOUT : Configuration Email (Gmail)
 # Pour utiliser Gmail : https://myaccount.google.com/apppasswords
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'  # À CONFIGURER
-app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'  # À CONFIGURER
-app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'  # À CONFIGURER
+app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com' # À CONFIGURER
+app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk' # À CONFIGURER
+app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com' # À CONFIGURER
 
 # ✅ AJOUT : Configuration des sessions
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Session expire après 24h
-app.config['SESSION_COOKIE_SECURE'] = False  # True en production avec HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True  # Protection XSS
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Protection CSRF
-app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)  # "Remember me" 7 jours
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24) # Session expire après 24h
+app.config['SESSION_COOKIE_SECURE'] = False # True en production avec HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True # Protection XSS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' # Protection CSRF
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7) # "Remember me" 7 jours
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # ✅ AJOUT : Activer la protection CSRF
@@ -82,7 +103,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
-login_manager.session_protection = 'strong'  # Protection forte contre le vol de session
+login_manager.session_protection = 'strong' # Protection forte contre le vol de session
 
 # ============================================================================
 # MODÈLES DE BASE DE DONNÉES
@@ -96,34 +117,34 @@ class Utilisateur(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     nom = db.Column(db.String(100))
     prenom = db.Column(db.String(100))
-    role = db.Column(db.String(20), nullable=False, default='employe')  # admin, comptable, employe
+    role = db.Column(db.String(20), nullable=False, default='employe') # admin, comptable, employe
     actif = db.Column(db.Boolean, default=True)
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     derniere_connexion = db.Column(db.DateTime)
-    
+
     # Champs pour la réinitialisation de mot de passe
     reset_token = db.Column(db.String(100), unique=True)
     reset_token_expiry = db.Column(db.DateTime)
-    telephone = db.Column(db.String(20))  # Pour envoi SMS
-    
+    telephone = db.Column(db.String(20)) # Pour envoi SMS
+
     # Relation avec les permissions
     permissions = db.relationship('Permission', backref='utilisateur', cascade='all, delete-orphan', lazy=True)
-    
+
     def set_password(self, password):
         """Hasher le mot de passe"""
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
         """Vérifier le mot de passe"""
         return check_password_hash(self.password_hash, password)
-    
+
     def generate_reset_token(self):
         """Générer un token de réinitialisation unique"""
         import secrets
         self.reset_token = secrets.token_urlsafe(32)
-        self.reset_token_expiry = datetime.utcnow() + timedelta(hours=24)  # Valide 24h
+        self.reset_token_expiry = datetime.utcnow() + timedelta(hours=24) # Valide 24h
         return self.reset_token
-    
+
     def verify_reset_token(self, token):
         """Vérifier si le token est valide et non expiré"""
         if self.reset_token != token:
@@ -133,26 +154,26 @@ class Utilisateur(UserMixin, db.Model):
         if datetime.utcnow() > self.reset_token_expiry:
             return False
         return True
-    
+
     def clear_reset_token(self):
         """Supprimer le token après utilisation"""
         self.reset_token = None
         self.reset_token_expiry = None
-    
+
     def has_permission(self, page):
         """Vérifier si l'utilisateur a la permission d'accéder à une page"""
         # Admin a accès à tout
         if self.role == 'admin':
             return True
-        
+
         # Chercher la permission spécifique
         perm = Permission.query.filter_by(utilisateur_id=self.id, page=page).first()
         if perm:
             return perm.actif
-        
+
         # Si pas de permission définie, utiliser les permissions par défaut du rôle
         return self._default_permissions().get(page, False)
-    
+
     def _default_permissions(self):
         """Permissions par défaut selon le rôle"""
         if self.role == 'admin':
@@ -169,13 +190,13 @@ class Utilisateur(UserMixin, db.Model):
                 'recherche': True,
                 'sauvegardes': True,
                 'historique': True,
-                'utilisateurs': False  # Comptable ne peut pas gérer les utilisateurs
+                'utilisateurs': False # Comptable ne peut pas gérer les utilisateurs
             }
-        else:  # employe
+        else: # employe
             return {
                 'dashboard': True,
                 'calendrier': True,
-                'factures': True,  # Consultation uniquement
+                'factures': True, # Consultation uniquement
                 'historique': True,
                 'nouvelle_facture_client': False,
                 'nouvelle_facture_employe': False,
@@ -185,7 +206,7 @@ class Utilisateur(UserMixin, db.Model):
                 'sauvegardes': False,
                 'utilisateurs': False
             }
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -223,13 +244,13 @@ class Permission(db.Model):
     """Modèle pour les permissions personnalisées par utilisateur"""
     id = db.Column(db.Integer, primary_key=True)
     utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateur.id'), nullable=False)
-    page = db.Column(db.String(50), nullable=False)  # Clé de PAGES_DISPONIBLES
+    page = db.Column(db.String(50), nullable=False) # Clé de PAGES_DISPONIBLES
     actif = db.Column(db.Boolean, default=True)
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Contrainte unique : un utilisateur ne peut avoir qu'une permission par page
     __table_args__ = (db.UniqueConstraint('utilisateur_id', 'page', name='_user_page_uc'),)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -246,20 +267,20 @@ class Permission(db.Model):
 class Log(db.Model):
     """Modèle pour tracer toutes les activités des utilisateurs"""
     id = db.Column(db.Integer, primary_key=True)
-    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateur.id'), nullable=True)  # Peut être NULL si système
-    utilisateur_nom = db.Column(db.String(100))  # Nom au moment de l'action (au cas où l'utilisateur est supprimé)
-    action = db.Column(db.String(100), nullable=False)  # Type d'action (connexion, création facture, etc.)
-    details = db.Column(db.Text)  # Détails de l'action en JSON
-    ip_address = db.Column(db.String(50))  # Adresse IP de l'utilisateur
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateur.id'), nullable=True) # Peut être NULL si système
+    utilisateur_nom = db.Column(db.String(100)) # Nom au moment de l'action (au cas où l'utilisateur est supprimé)
+    action = db.Column(db.String(100), nullable=False) # Type d'action (connexion, création facture, etc.)
+    details = db.Column(db.Text) # Détails de l'action en JSON
+    ip_address = db.Column(db.String(50)) # Adresse IP de l'utilisateur
     date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
+
     # Index pour recherches rapides
     __table_args__ = (
         db.Index('idx_log_date', 'date'),
         db.Index('idx_log_user', 'utilisateur_id'),
         db.Index('idx_log_action', 'action'),
     )
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -275,7 +296,7 @@ class Log(db.Model):
 def creer_log(action, details=None, user=None):
     """
     Créer un log d'activité
-    
+
     Args:
         action (str): Type d'action (ex: "connexion", "creation_facture")
         details (dict ou str): Détails de l'action
@@ -285,10 +306,10 @@ def creer_log(action, details=None, user=None):
         # Convertir details en JSON si c'est un dict
         if isinstance(details, dict):
             details = json.dumps(details, ensure_ascii=False)
-        
+
         # Récupérer l'IP de l'utilisateur
         ip = request.remote_addr if request else None
-        
+
         # Créer le log
         log = Log(
             utilisateur_id=user.id if user else None,
@@ -297,10 +318,10 @@ def creer_log(action, details=None, user=None):
             details=details,
             ip_address=ip
         )
-        
+
         db.session.add(log)
         db.session.commit()
-        
+
     except Exception as e:
         # Ne pas faire échouer l'action si le log échoue
         print(f"Erreur création log: {e}")
@@ -328,7 +349,7 @@ def check_authentication():
         'reset_password',
         'static'
     ]
-    
+
     # Routes API et system (ne pas vérifier les permissions)
     skip_permission_check = [
         'logout',
@@ -338,27 +359,27 @@ def check_authentication():
         'api_supprimer_utilisateur',
         'generer_lien_reset'
     ]
-    
+
     # Vérifier si la route demandée est publique
     endpoint = request.endpoint
-    
+
     # Si c'est une route publique, laisser passer
     if endpoint in public_routes:
         return None
-    
+
     # Si l'utilisateur n'est pas authentifié
     if not current_user.is_authenticated:
         # Sauvegarder l'URL demandée pour rediriger après login
         session['next_url'] = request.url
         flash('Veuillez vous connecter pour accéder à cette page.', 'warning')
         return redirect(url_for('login'))
-    
+
     # Si l'utilisateur est authentifié mais inactif
     if not current_user.actif:
         logout_user()
         flash('Votre compte a été désactivé. Contactez un administrateur.', 'danger')
         return redirect(url_for('login'))
-    
+
     # Vérifier les permissions personnalisées (sauf pour les routes API)
     if endpoint and endpoint not in skip_permission_check and not endpoint.startswith('api_'):
         # Mapper les endpoints aux pages
@@ -376,14 +397,14 @@ def check_authentication():
             'historique': 'historique',
             'utilisateurs': 'utilisateurs'
         }
-        
+
         page = endpoint_to_page.get(endpoint)
-        
+
         # Si la page nécessite une permission
         if page and not current_user.has_permission(page):
             flash('Vous n\'avez pas l\'autorisation d\'accéder à cette page.', 'danger')
             return redirect(url_for('index'))
-    
+
     return None
 
 # ============================================================================
@@ -419,12 +440,12 @@ def comptable_ou_admin_required(f):
 def send_email(to_email, subject, body):
     """
     Envoie un email via Gmail SMTP
-    
+
     Args:
         to_email (str): Adresse email du destinataire
         subject (str): Sujet de l'email
         body (str): Corps de l'email (HTML supporté)
-    
+
     Returns:
         tuple: (success: bool, message: str)
     """
@@ -432,28 +453,28 @@ def send_email(to_email, subject, body):
         # Vérifier que la configuration email est faite
         if app.config['MAIL_USERNAME'] == 'votre.email@gmail.com':
             return False, "Configuration email non faite. Voir app.py ligne 48-51"
-        
+
         # Créer le message
         msg = MIMEMultipart('alternative')
         msg['From'] = app.config['MAIL_DEFAULT_SENDER']
         msg['To'] = to_email
         msg['Subject'] = subject
-        
+
         # Ajouter le corps (HTML)
         html_part = MIMEText(body, 'html')
         msg.attach(html_part)
-        
+
         # Connexion au serveur SMTP
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
         server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-        
+
         # Envoyer l'email
         server.send_message(msg)
         server.quit()
-        
+
         return True, "Email envoyé avec succès"
-        
+
     except smtplib.SMTPAuthenticationError:
         return False, "Erreur d'authentification email. Vérifiez username/password."
     except smtplib.SMTPException as e:
@@ -464,11 +485,11 @@ def send_email(to_email, subject, body):
 def send_facture_email(facture, pdf_path):
     """
     Envoie une facture par email avec le PDF en pièce jointe
-    
+
     Args:
         facture: Objet Facture de la BDD
         pdf_path (str): Chemin vers le fichier PDF de la facture
-    
+
     Returns:
         tuple: (success: bool, message: str)
     """
@@ -476,25 +497,25 @@ def send_facture_email(facture, pdf_path):
         # Vérifier que la configuration email est faite
         if app.config['MAIL_USERNAME'] == 'votre.email@gmail.com':
             return False, "Configuration email non faite. Voir app.py ligne 48-51"
-        
+
         # Déterminer le destinataire
         if facture.type_facture == 'client':
             if not facture.client or not facture.client.email:
                 return False, "Le client n'a pas d'adresse email configurée"
             to_email = facture.client.email
             destinataire_nom = facture.client.nom
-        else:  # employe
+        else: # employe
             if not facture.employe or not facture.employe.email:
                 return False, "L'employé n'a pas d'adresse email configurée"
             to_email = facture.employe.email
             destinataire_nom = f"{facture.employe.prenom} {facture.employe.nom}"
-        
+
         # Créer le message
         msg = MIMEMultipart()
         msg['From'] = app.config['MAIL_DEFAULT_SENDER']
         msg['To'] = to_email
         msg['Subject'] = f"Facture {facture.numero} - {VOTRE_ENTREPRISE['nom']}"
-        
+
         # Corps de l'email en HTML
         email_body = f"""
         <html>
@@ -576,48 +597,48 @@ def send_facture_email(facture, pdf_path):
                 <h1>📄 Nouvelle Facture</h1>
                 <p>{VOTRE_ENTREPRISE['nom']}</p>
             </div>
-            
+
             <div class="content">
                 <p>Bonjour <strong>{destinataire_nom}</strong>,</p>
-                
+
                 <p>Veuillez trouver ci-joint votre facture en pièce jointe.</p>
-                
+
                 <div class="facture-details">
                     <h3>📋 Détails de la facture</h3>
-                    
+
                     <div class="info-row">
                         <span class="info-label">Numéro de facture :</span>
                         <span class="info-value">{facture.numero}</span>
                     </div>
-                    
+
                     <div class="info-row">
                         <span class="info-label">Date :</span>
                         <span class="info-value">{facture.date_facture.strftime('%d/%m/%Y')}</span>
                     </div>
-                    
+
                     <div class="info-row">
                         <span class="info-label">Date d'échéance :</span>
                         <span class="info-value">{facture.date_fin.strftime('%d/%m/%Y') if facture.date_fin else 'Non définie'}</span>
                     </div>
                 </div>
-                
+
                 <div class="montant-total">
                     💰 Montant Total : {facture.total_net:.2f} €
                 </div>
-                
+
                 <p><strong>Modalités de paiement :</strong></p>
                 <div class="facture-details">
                     <p><strong>Nom de la banque :</strong> {VOTRE_ENTREPRISE.get('banque', 'Non renseigné')}</p>
                     <p><strong>IBAN :</strong> {VOTRE_ENTREPRISE.get('iban', 'Non renseigné')}</p>
                     <p><strong>BIC/SWIFT :</strong> {VOTRE_ENTREPRISE.get('bic', 'Non renseigné')}</p>
                 </div>
-                
+
                 <p style="margin-top: 30px;">Pour toute question concernant cette facture, n'hésitez pas à nous contacter.</p>
-                
+
                 <p>Cordialement,<br>
                 <strong>{VOTRE_ENTREPRISE['nom']}</strong></p>
             </div>
-            
+
             <div class="footer">
                 <p><strong>{VOTRE_ENTREPRISE['nom']}</strong></p>
                 <p>{VOTRE_ENTREPRISE.get('adresse', '')}</p>
@@ -627,59 +648,59 @@ def send_facture_email(facture, pdf_path):
         </body>
         </html>
         """
-        
+
         # Ajouter le corps HTML
         msg.attach(MIMEText(email_body, 'html'))
-        
+
         # Ajouter le PDF en pièce jointe
         try:
             # ✅ DEBUG : Vérifier que le fichier existe et sa taille
             import os
             if not os.path.exists(pdf_path):
                 return False, f"Le fichier PDF n'existe pas : {pdf_path}"
-            
+
             file_size = os.path.getsize(pdf_path)
             print(f"📄 PDF trouvé : {pdf_path}")
             print(f"📏 Taille : {file_size} octets")
-            
+
             if file_size == 0:
                 return False, f"Le fichier PDF est vide (0 octets) : {pdf_path}"
-            
+
             with open(pdf_path, 'rb') as pdf_file:
                 pdf_content = pdf_file.read()
-                
+
                 # ✅ DEBUG : Vérifier le contenu
                 print(f"📦 Contenu lu : {len(pdf_content)} octets")
-                
+
                 if len(pdf_content) == 0:
                     return False, "Le contenu du PDF est vide après lecture"
-                
+
                 pdf_attachment = MIMEBase('application', 'pdf')
                 pdf_attachment.set_payload(pdf_content)
                 encoders.encode_base64(pdf_attachment)
-                
+
                 # Nom du fichier
                 filename = f"Facture_{facture.numero}.pdf"
                 pdf_attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-                
+
                 msg.attach(pdf_attachment)
-                
+
                 print(f"✅ PDF attaché avec succès : {filename}")
-                
+
         except FileNotFoundError:
             return False, f"Fichier PDF introuvable: {pdf_path}"
         except Exception as e:
             return False, f"Erreur lors de la lecture du PDF: {str(e)}"
-        
+
         # Connexion au serveur SMTP et envoi
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
         server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
         server.send_message(msg)
         server.quit()
-        
+
         return True, f"Facture envoyée avec succès à {to_email}"
-        
+
     except smtplib.SMTPAuthenticationError:
         return False, "Erreur d'authentification email. Vérifiez username/password."
     except smtplib.SMTPException as e:
@@ -702,7 +723,7 @@ class Client(db.Model):
     siret = db.Column(db.String(20))
     date_creation = db.Column(db.DateTime, default=datetime.now)
     factures = db.relationship('Facture', backref='client', lazy=True)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -730,10 +751,10 @@ class Employe(db.Model):
     amendes = db.relationship('Amende', backref='employe', lazy=True)
     livraisons = db.relationship('Livraison', backref='employe', lazy=True)
     factures = db.relationship('Facture', backref='employe', lazy=True, foreign_keys='Facture.employe_id')
-    
+
     def nom_complet(self):
         return f"{self.prenom} {self.nom}"
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -758,7 +779,7 @@ class Amende(db.Model):
     date_amende = db.Column(db.Date, nullable=False)
     statut = db.Column(db.String(20), default='en_attente') # en_attente, appliquée, annulée
     date_creation = db.Column(db.DateTime, default=datetime.now)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -780,7 +801,7 @@ class Livraison(db.Model):
     montant_jour = db.Column(db.Float, default=0.0)
     notes = db.Column(db.String(200))
     date_creation = db.Column(db.DateTime, default=datetime.now)
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -791,6 +812,7 @@ class Livraison(db.Model):
             'montant_jour': self.montant_jour,
             'notes': self.notes or ''
         }
+
 class Facture(db.Model):
     """Modèle pour les factures"""
     id = db.Column(db.Integer, primary_key=True)
@@ -809,25 +831,25 @@ class Facture(db.Model):
     statut = db.Column(db.String(20), default='en_attente')
     notes = db.Column(db.Text)
     date_creation = db.Column(db.DateTime, default=datetime.now)
-    
+
     # ✅ NOUVEAUX CHAMPS POUR GESTION DES PAIEMENTS
-    statut_paiement = db.Column(db.String(20), default='impayee')  # impayee, payee, en_retard, partielle
+    statut_paiement = db.Column(db.String(20), default='impayee') # impayee, payee, en_retard, partielle
     date_paiement = db.Column(db.Date, nullable=True)
-    methode_paiement = db.Column(db.String(50), nullable=True)  # virement, cheque, especes, carte
+    methode_paiement = db.Column(db.String(50), nullable=True) # virement, cheque, especes, carte
     montant_paye = db.Column(db.Float, default=0.0)
-    
+
     amendes = db.relationship('Amende', backref='facture', lazy=True)
-    
+
     def to_dict(self):
         # Récupérer les emails de façon sécurisée
         client_email = ''
         if self.client:
             client_email = getattr(self.client, 'email', '') or ''
-        
+
         employe_email = ''
         if self.employe:
             employe_email = getattr(self.employe, 'email', '') or ''
-        
+
         return {
             'id': self.id,
             'numero': self.numero,
@@ -836,9 +858,9 @@ class Facture(db.Model):
             'date_debut': self.date_debut.strftime('%d/%m/%Y') if self.date_debut else '',
             'date_fin': self.date_fin.strftime('%d/%m/%Y') if self.date_fin else '',
             'client_nom': self.client.nom if self.client else '',
-            'client_email': client_email,  # ✅ SÉCURISÉ
+            'client_email': client_email, # ✅ SÉCURISÉ
             'employe_nom': self.employe.nom_complet() if self.employe else '',
-            'employe_email': employe_email,  # ✅ SÉCURISÉ
+            'employe_email': employe_email, # ✅ SÉCURISÉ
             'total_brut': self.total_brut,
             'total_amendes': self.total_amendes,
             'total_net': self.total_net,
@@ -862,12 +884,12 @@ def generer_numero_facture(type_facture):
     en incrémentant le dernier numéro existant.
     """
     prefix = 'F' if type_facture == 'client' else 'S'
-    
+
     # Trouver la dernière facture du même type
     derniere_facture = Facture.query.filter_by(
         type_facture=type_facture
     ).order_by(Facture.id.desc()).first()
-    
+
     if derniere_facture:
         # Extraire le numéro et l'incrémenter (Ex: F-0001 -> 0001)
         try:
@@ -879,10 +901,10 @@ def generer_numero_facture(type_facture):
     else:
         # Premier numéro de facture
         nouveau_numero = 1
-        
+
     # Formater avec des zéros de tête (ex: 0001)
     numero_formate = f"{nouveau_numero:04d}"
-    
+
     return f"{prefix}-{numero_formate}"
 
 def generer_matricule_employe(nom, prenom, date_embauche=None):
@@ -892,14 +914,14 @@ def generer_matricule_employe(nom, prenom, date_embauche=None):
     - XXX = 3 premières lettres du NOM (en majuscules)
     - YYY = 3 premières lettres du PRÉNOM (en majuscules)
     - NNNN = Année d'embauche + numéro séquentiel sur 2 chiffres
-    
+
     Exemples:
     - Lutula Yannick embauché en 2024 (1er) → LUT-YAN-2401
     - Dupont Marie embauchée en 2024 (2ème) → DUP-MAR-2402
     - Ka Li embauché en 2025 (1er) → KAX-LIX-2501
     """
     import unicodedata
-    
+
     # Fonction pour nettoyer les accents et caractères spéciaux
     def nettoyer_texte(texte):
         # Supprimer les accents
@@ -909,15 +931,15 @@ def generer_matricule_employe(nom, prenom, date_embauche=None):
         )
         # Garder seulement les lettres
         return ''.join(c for c in texte_sans_accent if c.isalpha()).upper()
-    
+
     # Nettoyer et extraire les premières lettres
     nom_clean = nettoyer_texte(nom)
     prenom_clean = nettoyer_texte(prenom)
-    
+
     # Prendre les 3 premières lettres (ou compléter avec X si trop court)
     part_nom = (nom_clean[:3] + 'XXX')[:3]
     part_prenom = (prenom_clean[:3] + 'XXX')[:3]
-    
+
     # Année d'embauche (ou année actuelle si non fournie)
     if date_embauche:
         if isinstance(date_embauche, str):
@@ -926,18 +948,18 @@ def generer_matricule_employe(nom, prenom, date_embauche=None):
             annee = date_embauche.year
     else:
         annee = datetime.now().year
-    
+
     # Deux derniers chiffres de l'année
     annee_court = str(annee)[-2:]
-    
+
     # Trouver le numéro séquentiel pour cette année
     # Chercher tous les employés embauchés la même année
     prefix_recherche = f"{part_nom}-{part_prenom}-{annee_court}"
-    
+
     employés_meme_pattern = Employe.query.filter(
         Employe.matricule.like(f'{prefix_recherche}%')
     ).all()
-    
+
     # Trouver le numéro le plus élevé
     max_numero = 0
     for emp in employés_meme_pattern:
@@ -948,18 +970,17 @@ def generer_matricule_employe(nom, prenom, date_embauche=None):
                 max_numero = numero
         except:
             pass
-    
+
     # Nouveau numéro = max + 1
     nouveau_numero = max_numero + 1
-    
+
     # Formater le numéro sur 2 chiffres
     numero_formate = f"{nouveau_numero:02d}"
-    
+
     # Construire le matricule final
     matricule = f"{part_nom}-{part_prenom}-{annee_court}{numero_formate}"
-    
-    return matricule
 
+    return matricule
 
 # ============================================================================
 # CONFIGURATION ENTREPRISE
@@ -986,7 +1007,7 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     """Génère un PDF de facture avec un design moderne et professionnel"""
     c = canvas.Canvas(chemin_pdf, pagesize=A4)
     width, height = A4
-    
+
     # Couleurs modernes
     BLEU_FONCE = colors.HexColor("#1e3a8a")
     BLEU_CLAIR = colors.HexColor("#3b82f6")
@@ -994,27 +1015,27 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     GRIS_TEXTE = colors.HexColor("#6b7280")
     VERT = colors.HexColor("#10b981")
     ROUGE = colors.HexColor("#ef4444")
-    
+
     # --- BANDEAU SUPÉRIEUR COLORÉ ---
     c.setFillColor(BLEU_FONCE)
     c.rect(0, height - 4*cm, width, 4*cm, fill=1, stroke=0)
-    
+
     y = height - 1.5*cm
-    
+
     # Logo (sur fond bleu)
     logo_path = os.path.join('static', 'images', 'logo.png')
     if os.path.exists(logo_path):
         try:
-            c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, 
-                       preserveAspectRatio=True, mask='auto')
+            c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm,
+                        preserveAspectRatio=True, mask='auto')
         except:
             pass
-    
+
     # Informations entreprise (en blanc sur fond bleu)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 11)
     c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["nom"])
-    
+
     c.setFont("Helvetica", 9)
     y -= 0.5*cm
     c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["adresse"])
@@ -1024,72 +1045,72 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     c.drawRightString(width - 1.5*cm, y, f"Tél: {VOTRE_ENTREPRISE['telephone']}")
     y -= 0.4*cm
     c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE['email'])
-    
+
     # --- TITRE DE LA FACTURE ---
     y = height - 5*cm
-    
+
     # Encadré du titre
     c.setFillColor(BLEU_CLAIR)
     c.roundRect(1.5*cm, y - 1.2*cm, 8*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
-    
+
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
     titre = "FACTURE" if type_facture == 'client' else "BULLETIN DE SALAIRE"
     c.drawString(2*cm, y - 0.9*cm, titre)
-    
+
     # --- INFORMATIONS FACTURE (Encadré) ---
     y -= 2*cm
-    
+
     # Encadré gris pour les infos
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(1.5*cm, y - 2.5*cm, 8*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
-    
+
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
     c.drawString(2*cm, y - 0.6*cm, "INFORMATIONS")
-    
+
     c.setFont("Helvetica", 9)
     c.setFillColor(colors.black)
     c.drawString(2*cm, y - 1.1*cm, f"N° Facture:")
     c.setFont("Helvetica-Bold", 9)
     c.drawString(4*cm, y - 1.1*cm, data['numero_facture'])
-    
+
     c.setFont("Helvetica", 9)
     c.drawString(2*cm, y - 1.6*cm, f"Date:")
     c.setFont("Helvetica-Bold", 9)
     c.drawString(4*cm, y - 1.6*cm, data['date_facture'])
-    
+
     if data.get('date_debut') and data.get('date_fin'):
         try:
             date_debut_str = data['date_debut']
             date_fin_str = data['date_fin']
-            
+
             if '-' in date_debut_str:
                 date_debut = datetime.strptime(date_debut_str, "%Y-%m-%d")
                 date_fin = datetime.strptime(date_fin_str, "%Y-%m-%d")
                 date_debut_str = date_debut.strftime('%d/%m/%Y')
                 date_fin_str = date_fin.strftime('%d/%m/%Y')
-            
+
             c.setFont("Helvetica", 9)
             c.drawString(2*cm, y - 2.1*cm, f"Période:")
             c.setFont("Helvetica-Bold", 9)
             c.drawString(4*cm, y - 2.1*cm, f"{date_debut_str} - {date_fin_str}")
         except:
             pass
-    
+
     # --- CLIENT/EMPLOYÉ (Encadré) ---
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
-    
+
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
     dest_title = "CLIENT" if type_facture == 'client' else "EMPLOYÉ"
     c.drawString(width/2 + 0.5*cm, y - 0.6*cm, dest_title)
-    
+
     c.setFont("Helvetica-Bold", 11)
     c.setFillColor(colors.black)
     c.drawString(width/2 + 0.5*cm, y - 1.2*cm, data['destinataire_nom'])
-    
+
     if type_facture == 'client':
         c.setFont("Helvetica", 9)
         if data.get('destinataire_adresse'):
@@ -1099,24 +1120,24 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     else:
         c.setFont("Helvetica", 9)
         c.drawString(width/2 + 0.5*cm, y - 1.7*cm, f"Matricule: {data.get('matricule', 'N/A')}")
-    
+
     y -= 3.5*cm
-    
+
     # --- TABLEAU DES DÉTAILS ---
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(BLEU_FONCE)
     header_height = 0.8*cm
     c.roundRect(1.5*cm, y - header_height, width - 3*cm, header_height, 0.2*cm, fill=1, stroke=0)
-    
+
     # Colonnes
     COL_DESC = 2*cm
     COL_QTY = 12*cm
     COL_PRIX = 14.5*cm
     COL_TOTAL = 17.5*cm
-    
+
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 9)
-    
+
     if type_facture == 'client':
         c.drawString(COL_DESC, y - 0.55*cm, "DESCRIPTION")
         c.drawRightString(COL_QTY + 1.2*cm, y - 0.55*cm, "QTÉ")
@@ -1125,18 +1146,18 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     else:
         c.drawString(COL_DESC, y - 0.55*cm, "DESCRIPTION")
         c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.55*cm, "MONTANT")
-    
+
     y -= header_height + 0.3*cm
-    
+
     # --- LIGNES DES DÉTAILS ---
     c.setFont("Helvetica", 9)
     c.setFillColor(colors.black)
-    
+
     total_brut = data.get('total_brut', 0)
     total_amendes = data.get('total_amendes', 0)
-    
+
     ligne_index = 0
-    
+
     if type_facture == 'client':
         details = data.get('details', [])
         for detail in details:
@@ -1145,17 +1166,17 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
                 if ligne_index % 2 == 0:
                     c.setFillColor(colors.HexColor("#f9fafb"))
                     c.rect(1.5*cm, y - 0.7*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
-                
+
                 c.setFillColor(colors.black)
                 description = detail['description']
                 if len(description) > 60:
                     description = description[:57] + "..."
                 c.drawString(COL_DESC, y - 0.45*cm, description)
-                
+
                 c.drawRightString(COL_QTY + 1.2*cm, y - 0.45*cm, f"{detail.get('quantite', 1):.2f}")
                 c.drawRightString(COL_PRIX + 1.2*cm, y - 0.45*cm, f"{detail.get('prix_ht', 0):.2f} €")
                 c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"{detail.get('total', 0):.2f} €")
-                
+
                 y -= 0.7*cm
                 ligne_index += 1
     else:
@@ -1166,7 +1187,7 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
         c.drawString(COL_DESC, y - 0.45*cm, "Salaire brut")
         c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"{total_brut:.2f} €")
         y -= 0.7*cm
-        
+
         # Amendes
         amendes = data.get('amendes', [])
         for amende in amendes:
@@ -1174,35 +1195,35 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
             c.drawString(COL_DESC, y - 0.45*cm, f"- {amende.get('raison', '')[:50]}")
             c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"-{amende.get('montant', 0):.2f} €")
             y -= 0.7*cm
-    
+
     # --- TOTAUX (Encadré coloré) ---
     y -= 0.5*cm
-    
+
     # Récupérer l'option TVA
     appliquer_tva = data.get('appliquer_tva', True)
-    
+
     if type_facture == 'client':
         if appliquer_tva:
             # Avec TVA
             total_tva = total_brut * (TAUX_TVA / 100)
             total_ttc = total_brut + total_tva
-            
+
             # Fond des totaux
             c.setFillColor(GRIS_CLAIR)
             c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 2.3*cm, 0.3*cm, fill=1, stroke=0)
-            
+
             c.setFont("Helvetica", 10)
             c.setFillColor(colors.black)
             c.drawRightString(width - 4*cm, y - 0.7*cm, "Total HT:")
             c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
-            
+
             c.drawRightString(width - 4*cm, y - 1.3*cm, f"TVA ({TAUX_TVA}%):")
             c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"{total_tva:.2f} €")
-            
+
             # Total TTC en grand
             c.setFillColor(VERT)
             c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
-            
+
             c.setFillColor(colors.white)
             c.setFont("Helvetica-Bold", 14)
             c.drawRightString(width - 4*cm, y - 2.2*cm, "Total TTC:")
@@ -1211,62 +1232,62 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
             # Sans TVA
             c.setFillColor(GRIS_CLAIR)
             c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 1.3*cm, 0.3*cm, fill=1, stroke=0)
-            
+
             c.setFillColor(VERT)
             c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
-            
+
             c.setFillColor(colors.white)
             c.setFont("Helvetica-Bold", 14)
             c.drawRightString(width - 4*cm, y - 1.2*cm, "Total HT:")
             c.drawRightString(width - 1.5*cm, y - 1.2*cm, f"{total_brut:.2f} €")
-            
+
             total_ttc = total_brut
             total_tva = 0
     else:
         # Employé
         total_net = total_brut - total_amendes
-        
+
         c.setFillColor(GRIS_CLAIR)
         c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 2.3*cm, 0.3*cm, fill=1, stroke=0)
-        
+
         c.setFont("Helvetica", 10)
         c.setFillColor(colors.black)
         c.drawRightString(width - 4*cm, y - 0.7*cm, "Brut:")
         c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
-        
+
         c.setFillColor(ROUGE)
         c.drawRightString(width - 4*cm, y - 1.3*cm, "Déductions:")
         c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"-{total_amendes:.2f} €")
-        
+
         c.setFillColor(VERT)
         c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
-        
+
         c.setFillColor(colors.white)
         c.setFont("Helvetica-Bold", 14)
         c.drawRightString(width - 4*cm, y - 2.2*cm, "Net à payer:")
         c.drawRightString(width - 1.5*cm, y - 2.2*cm, f"{total_net:.2f} €")
-        
+
         total_ttc = total_net
         total_tva = 0
-    
+
     y -= 3*cm
-    
+
     # --- NOTES ET CONDITIONS ---
     if data.get('notes'):
         c.setStrokeColor(BLEU_CLAIR)
         c.setLineWidth(2)
         c.line(1.5*cm, y, width - 1.5*cm, y)
         y -= 0.7*cm
-        
+
         c.setFont("Helvetica-Bold", 10)
         c.setFillColor(BLEU_FONCE)
         c.drawString(1.5*cm, y, "NOTES / OBSERVATIONS:")
         y -= 0.5*cm
-        
+
         c.setFont("Helvetica", 9)
         c.setFillColor(GRIS_TEXTE)
         notes_text = data['notes']
-        
+
         # Découper en lignes
         max_chars = 95
         lignes = []
@@ -1278,15 +1299,15 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
             notes_text = notes_text[pos:].strip()
         if notes_text:
             lignes.append(notes_text)
-        
+
         for ligne in lignes[:8]:
             c.drawString(1.5*cm, y, ligne)
             y -= 0.45*cm
-    
+
     # --- PIED DE PAGE ---
     c.setFillColor(GRIS_CLAIR)
     c.rect(0, 0, width, 2*cm, fill=1, stroke=0)
-    
+
     c.setFont("Helvetica", 8)
     c.setFillColor(GRIS_TEXTE)
     if type_facture == 'client':
@@ -1294,13 +1315,13 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
         c.drawCentredString(width/2, 0.7*cm, f"Paiement à 30 jours • Facture émise le {datetime.now().strftime('%d/%m/%Y')}")
     else:
         c.drawCentredString(width/2, 1*cm, f"Document émis le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
-    
+
     c.save()
 
     return total_brut, total_tva, total_ttc
     #else:
-    #return total_brut, total_amendes, total_net
-    
+        #return total_brut, total_amendes, total_net
+
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
 # ============================================================================
@@ -1334,33 +1355,33 @@ def forgot_password():
     """Page mot de passe oublié (publique)"""
     if request.method == 'POST':
         username_or_email = request.form.get('username', '').strip()
-        
+
         if not username_or_email:
             flash('Veuillez entrer votre nom d\'utilisateur ou email.', 'danger')
             return render_template('forgot_password.html', entreprise=VOTRE_ENTREPRISE)
-        
+
         # Chercher l'utilisateur par username OU email
         user = Utilisateur.query.filter(
-            (Utilisateur.username == username_or_email) | 
+            (Utilisateur.username == username_or_email) |
             (Utilisateur.email == username_or_email)
         ).first()
-        
+
         if not user:
             # Pour la sécurité, on ne dit pas si l'utilisateur existe ou non
             flash('Si cet utilisateur existe, un email de réinitialisation a été envoyé.', 'info')
             return render_template('forgot_password.html', entreprise=VOTRE_ENTREPRISE)
-        
+
         if not user.actif:
             flash('Ce compte est désactivé. Contactez un administrateur.', 'danger')
             return render_template('forgot_password.html', entreprise=VOTRE_ENTREPRISE)
-        
+
         # Générer le token
         token = user.generate_reset_token()
         db.session.commit()
-        
+
         # Générer le lien
         reset_link = f"http://localhost:5000/reset-password/{token}"
-        
+
         # Essayer d'envoyer l'email (si configuré)
         if user.email:
             # Préparer l'email HTML
@@ -1372,8 +1393,8 @@ def forgot_password():
                 <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
                 <p>Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
                 <p style="margin: 30px 0;">
-                    <a href="{reset_link}" 
-                       style="background: #3498DB; color: white; padding: 12px 30px; 
+                    <a href="{reset_link}"
+                       style="background: #3498DB; color: white; padding: 12px 30px;
                               text-decoration: none; border-radius: 5px; display: inline-block;">
                         Réinitialiser mon mot de passe
                     </a>
@@ -1389,14 +1410,14 @@ def forgot_password():
             </body>
             </html>
             """
-            
+
             # Envoyer l'email
             success, message = send_email(
                 to_email=user.email,
                 subject="Réinitialisation de votre mot de passe - Mbeka",
                 body=email_body
             )
-            
+
             if success:
                 flash(f'✅ Un email de réinitialisation a été envoyé à {user.email}', 'success')
             else:
@@ -1405,9 +1426,9 @@ def forgot_password():
                 flash(f'Détails techniques : {message}', 'danger')
         else:
             flash('Aucun email associé à ce compte. Contactez un administrateur.', 'danger')
-        
+
         return render_template('forgot_password.html', entreprise=VOTRE_ENTREPRISE)
-    
+
     return render_template('forgot_password.html', entreprise=VOTRE_ENTREPRISE)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -1415,50 +1436,50 @@ def login():
     """Page de connexion"""
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
+
         user = Utilisateur.query.filter_by(username=username).first()
-        
+
         if user and user.check_password(password):
             if not user.actif:
                 # Log tentative de connexion compte désactivé
-                creer_log('tentative_connexion_compte_desactive', 
-                         f"Tentative de connexion avec le compte désactivé : {username}",
-                         user)
+                creer_log('tentative_connexion_compte_desactive',
+                          f"Tentative de connexion avec le compte désactivé : {username}",
+                          user)
                 flash('Votre compte est désactivé. Contactez un administrateur.', 'danger')
                 return redirect(url_for('login'))
-            
+
             # Connexion avec session persistante
             remember = request.form.get('remember', False)
             login_user(user, remember=remember)
-            
+
             # Marquer la session comme permanente si "se souvenir de moi"
             if remember:
                 session.permanent = True
-            
+
             user.derniere_connexion = datetime.utcnow()
             db.session.commit()
-            
+
             # Log connexion réussie
-            creer_log('connexion', 
-                     {'remember': remember, 'ip': request.remote_addr},
-                     user)
-            
+            creer_log('connexion',
+                      {'remember': remember, 'ip': request.remote_addr},
+                      user)
+
             flash(f'Bienvenue {user.prenom or user.username} !', 'success')
-            
+
             # Rediriger vers la page demandée ou l'accueil
             next_page = request.args.get('next')
             return redirect(next_page if next_page else url_for('index'))
         else:
             # Log tentative de connexion échouée
-            creer_log('tentative_connexion_echouee', 
-                     f"Tentative avec username : {username}",
-                     None)
+            creer_log('tentative_connexion_echouee',
+                      f"Tentative avec username : {username}",
+                      None)
             flash('Identifiant ou mot de passe incorrect.', 'danger')
-    
+
     return render_template('login.html',
                            entreprise=VOTRE_ENTREPRISE)
 
@@ -1468,7 +1489,7 @@ def logout():
     """Déconnexion"""
     # Log déconnexion avant de déconnecter
     creer_log('deconnexion', None, current_user)
-    
+
     logout_user()
     flash('Vous avez été déconnecté avec succès.', 'info')
     return redirect(url_for('login'))
@@ -1495,15 +1516,15 @@ def api_creer_utilisateur():
     """API: Créer un nouvel utilisateur"""
     try:
         data = request.json
-        
+
         # Vérifier si l'username existe déjà
         if Utilisateur.query.filter_by(username=data['username']).first():
             return jsonify({'error': 'Nom d\'utilisateur déjà utilisé'}), 400
-        
+
         # Vérifier si l'email existe déjà
         if Utilisateur.query.filter_by(email=data['email']).first():
             return jsonify({'error': 'Email déjà utilisé'}), 400
-        
+
         # Créer le nouvel utilisateur
         user = Utilisateur(
             username=data['username'],
@@ -1515,16 +1536,16 @@ def api_creer_utilisateur():
             actif=True
         )
         user.set_password(data['password'])
-        
+
         db.session.add(user)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Utilisateur créé avec succès',
             'utilisateur': user.to_dict()
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1537,15 +1558,15 @@ def api_modifier_utilisateur(user_id):
         user = Utilisateur.query.get(user_id)
         if not user:
             return jsonify({'error': 'Utilisateur introuvable'}), 404
-        
+
         data = request.json
-        
+
         # Ne pas permettre de modifier le dernier admin
         if user.role == 'admin' and data.get('role') != 'admin':
             nb_admins = Utilisateur.query.filter_by(role='admin', actif=True).count()
             if nb_admins <= 1:
                 return jsonify({'error': 'Impossible de retirer le rôle admin au dernier administrateur'}), 400
-        
+
         # Mettre à jour les champs
         if 'nom' in data:
             user.nom = data['nom']
@@ -1561,15 +1582,15 @@ def api_modifier_utilisateur(user_id):
             user.actif = data['actif']
         if 'password' in data and data['password']:
             user.set_password(data['password'])
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Utilisateur modifié avec succès',
             'utilisateur': user.to_dict()
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1582,25 +1603,25 @@ def api_supprimer_utilisateur(user_id):
         user = Utilisateur.query.get(user_id)
         if not user:
             return jsonify({'error': 'Utilisateur introuvable'}), 404
-        
+
         # Ne pas permettre de supprimer le dernier admin
         if user.role == 'admin':
             nb_admins = Utilisateur.query.filter_by(role='admin', actif=True).count()
             if nb_admins <= 1:
                 return jsonify({'error': 'Impossible de supprimer le dernier administrateur'}), 400
-        
+
         # Ne pas permettre de se supprimer soi-même
         if user.id == current_user.id:
             return jsonify({'error': 'Vous ne pouvez pas supprimer votre propre compte'}), 400
-        
+
         db.session.delete(user)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Utilisateur supprimé avec succès'
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1613,18 +1634,18 @@ def api_get_permissions(user_id):
         user = Utilisateur.query.get(user_id)
         if not user:
             return jsonify({'error': 'Utilisateur introuvable'}), 404
-        
+
         # Récupérer toutes les permissions
         permissions_dict = {}
         for page_key in PAGES_DISPONIBLES.keys():
             permissions_dict[page_key] = user.has_permission(page_key)
-        
+
         return jsonify({
             'success': True,
             'permissions': permissions_dict,
             'pages_disponibles': PAGES_DISPONIBLES
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1636,13 +1657,13 @@ def api_update_permissions(user_id):
         user = Utilisateur.query.get(user_id)
         if not user:
             return jsonify({'error': 'Utilisateur introuvable'}), 404
-        
+
         data = request.get_json()
         permissions_data = data.get('permissions', {})
-        
+
         # Supprimer toutes les permissions existantes
         Permission.query.filter_by(utilisateur_id=user_id).delete()
-        
+
         # Créer les nouvelles permissions
         for page, actif in permissions_data.items():
             if page in PAGES_DISPONIBLES:
@@ -1652,14 +1673,14 @@ def api_update_permissions(user_id):
                     actif=actif
                 )
                 db.session.add(perm)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Permissions mises à jour avec succès'
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1672,20 +1693,20 @@ def generer_lien_reset(user_id):
         user = Utilisateur.query.get(user_id)
         if not user:
             return jsonify({'error': 'Utilisateur introuvable'}), 404
-        
+
         # Générer le token
         token = user.generate_reset_token()
         db.session.commit()
-        
+
         # Générer le lien (à adapter selon votre domaine)
         reset_link = f"http://localhost:5000/reset-password/{token}"
-        
+
         # Vérifier si on doit envoyer l'email automatiquement
         send_email_auto = request.json.get('send_email', False) if request.is_json else False
-        
+
         email_sent = False
         email_message = ""
-        
+
         if send_email_auto and user.email:
             # Préparer l'email HTML
             email_body = f"""
@@ -1696,8 +1717,8 @@ def generer_lien_reset(user_id):
                 <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
                 <p>Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
                 <p style="margin: 30px 0;">
-                    <a href="{reset_link}" 
-                       style="background: #3498DB; color: white; padding: 12px 30px; 
+                    <a href="{reset_link}"
+                       style="background: #3498DB; color: white; padding: 12px 30px;
                               text-decoration: none; border-radius: 5px; display: inline-block;">
                         Réinitialiser mon mot de passe
                     </a>
@@ -1713,17 +1734,17 @@ def generer_lien_reset(user_id):
             </body>
             </html>
             """
-            
+
             # Envoyer l'email
             success, message = send_email(
                 to_email=user.email,
                 subject="Réinitialisation de votre mot de passe - Mbeka",
                 body=email_body
             )
-            
+
             email_sent = success
             email_message = message
-        
+
         # Préparer les messages pour copie manuelle
         message_sms = f"Votre lien de réinitialisation Mbeka : {reset_link} (valide 24h)"
         message_email_text = f"""
@@ -1739,7 +1760,7 @@ Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
 Cordialement,
 L'équipe Mbeka
 """
-        
+
         return jsonify({
             'success': True,
             'message': 'Lien de réinitialisation généré',
@@ -1752,7 +1773,7 @@ L'équipe Mbeka
             'email_sent': email_sent,
             'email_message': email_message
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1764,18 +1785,18 @@ def reset_password(token):
     if current_user.is_authenticated:
         flash('Vous êtes déjà connecté.', 'info')
         return redirect(url_for('index'))
-    
+
     # Trouver l'utilisateur avec ce token
     user = Utilisateur.query.filter_by(reset_token=token).first()
-    
+
     if not user or not user.verify_reset_token(token):
         flash('Ce lien de réinitialisation est invalide ou a expiré.', 'danger')
         return redirect(url_for('login'))
-    
+
     if request.method == 'POST':
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-        
+
         if not new_password or not confirm_password:
             flash('Veuillez remplir tous les champs.', 'danger')
         elif new_password != confirm_password:
@@ -1787,10 +1808,10 @@ def reset_password(token):
             user.set_password(new_password)
             user.clear_reset_token()
             db.session.commit()
-            
+
             flash(f'✅ Mot de passe changé avec succès ! Vous pouvez maintenant vous connecter.', 'success')
             return redirect(url_for('login'))
-    
+
     return render_template('reset_password.html',
                            entreprise=VOTRE_ENTREPRISE,
                            token=token,
@@ -1805,7 +1826,7 @@ def reset_password(token):
 def index():
     """Page d'accueil"""
     employes = Employe.query.all()
-    
+
     return render_template('index.html',
                            entreprise=VOTRE_ENTREPRISE,
                            employes=employes,
@@ -1837,7 +1858,7 @@ def nouvelle_facture_client():
     numero_auto = generer_numero_facture('client')
     clients = Client.query.order_by(Client.nom).all()
     employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
-    
+
     return render_template('nouvelle_facture_client.html',
                            entreprise=VOTRE_ENTREPRISE,
                            tva=TAUX_TVA,
@@ -1851,7 +1872,7 @@ def nouvelle_facture_employe():
     """Page pour créer une facture employé"""
     numero_auto = generer_numero_facture('employe')
     employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
-    
+
     # Récupérer les amendes en attente pour chaque employé
     employes_avec_amendes = []
     for emp in employes:
@@ -1859,15 +1880,15 @@ def nouvelle_facture_employe():
             employe_id=emp.id,
             statut='en_attente'
         ).all()
-        
+
         total_amendes = sum(a.montant for a in amendes_en_attente)
-        
+
         employes_avec_amendes.append({
             'employe': emp,
             'amendes': amendes_en_attente,
             'total_amendes': total_amendes
         })
-    
+
     return render_template('nouvelle_facture_employe.html',
                            entreprise=VOTRE_ENTREPRISE,
                            numero_auto=numero_auto,
@@ -1883,54 +1904,54 @@ def generer_facture_client():
     try:
         # Récupérer les données du formulaire
         data = request.form
-        
+
         # ✅ VALIDATION : Vérifier que client_id est valide
         client_id_str = data.get('client_id', '').strip()
-        
+
         if not client_id_str or not client_id_str.isdigit():
             app.logger.error(f"Client ID invalide: {client_id_str}")
             return jsonify({'error': "Veuillez sélectionner un client valide"}), 400
-        
+
         client_id = int(client_id_str)
         client = Client.query.get(client_id)
-        
+
         if not client:
             app.logger.error(f"Client non trouvé: {client_id}")
             return jsonify({'error': "Client non trouvé"}), 404
-        
+
         # Créer le dossier factures s'il n'existe pas
         os.makedirs('factures', exist_ok=True)
-        
+
         # Générer un numéro de facture automatique
         numero_facture = data.get('numero_facture', '').strip()
         if not numero_facture or numero_facture.lower() == 'new':
             numero_facture = generer_numero_facture('client')
-        
+
         app.logger.info(f"Génération facture {numero_facture} pour client {client.nom}")
-        
+
         # ✅ CORRECTION CRITIQUE : Lecture dynamique de TOUS les articles
         total_brut = 0
         details = []
-        
+
         index = 1
         max_articles = 100  # Limite de sécurité
-        
+
         while index <= max_articles:
             description_key = f'details[{index}][description]'
-            
+
             # Si la clé n'existe pas, on arrête
             if description_key not in data:
                 break
-            
+
             description = data.get(description_key, '').strip()
-            
+
             # Si la description existe et n'est pas vide
             if description:
                 try:
                     quantite = float(data.get(f'details[{index}][quantite]', 0))
                     prix_ht = float(data.get(f'details[{index}][prix_ht]', 0))
                     total = quantite * prix_ht
-                    
+
                     details.append({
                         'description': description,
                         'quantite': quantite,
@@ -1938,27 +1959,27 @@ def generer_facture_client():
                         'total': total
                     })
                     total_brut += total
-                    
+
                     app.logger.info(f"Article {index}: {description} - {quantite} x {prix_ht}€ = {total}€")
-                    
+
                 except (ValueError, TypeError) as e:
                     app.logger.warning(f"Erreur article {index}: {e}")
                     # On continue avec les autres articles
                     pass
-            
+
             index += 1
-        
+
         # ✅ VALIDATION : Au moins un article
         if not details:
             app.logger.error("Aucun article valide trouvé")
             return jsonify({'error': "Veuillez ajouter au moins un article valide avec une description"}), 400
-        
+
         app.logger.info(f"Total: {len(details)} articles, {total_brut}€ HT")
-        
+
         # ✅ RÉCUPÉRER LES NOTES ET RÉCLAMATIONS
         notes = data.get('notes', '').strip()
         reclamation = data.get('reclamation', '').strip()
-        
+
         # Combiner notes et réclamation pour l'affichage
         notes_completes = ""
         if notes:
@@ -1967,10 +1988,10 @@ def generer_facture_client():
             if notes_completes:
                 notes_completes += "\n\n"
             notes_completes += f"RÉCLAMATION: {reclamation}"
-        
+
         # ✅ Récupérer l'option TVA
         appliquer_tva = data.get('appliquer_tva') == 'on'
-        
+
         # Préparer les données pour le PDF
         pdf_data = {
             'numero_facture': numero_facture,
@@ -1985,18 +2006,18 @@ def generer_facture_client():
             'notes': notes_completes,  # ✅ Notes complètes avec réclamation
             'appliquer_tva': appliquer_tva  # ✅ Option TVA
         }
-        
+
         # Générer le nom du fichier PDF
         nom_fichier = f"Facture_{numero_facture.replace('/', '_')}.pdf"
         chemin_pdf = os.path.join('factures', nom_fichier)
-        
+
         app.logger.info(f"Génération PDF: {chemin_pdf}")
-        
+
         # Générer le PDF
         total_ht, total_tva, total_ttc = generer_pdf_facture(pdf_data, chemin_pdf, 'client')
-        
+
         app.logger.info(f"PDF généré: HT={total_ht}€, TVA={total_tva}€, TTC={total_ttc}€")
-        
+
         # ✅ SAUVEGARDER EN BASE DE DONNÉES
         facture = Facture(
             numero=numero_facture,
@@ -2012,25 +2033,25 @@ def generer_facture_client():
             notes=notes_completes,  # ✅ Sauvegarder les notes complètes
             statut='en_attente'
         )
-        
+
         db.session.add(facture)
         db.session.commit()
-        
+
         app.logger.info(f"✅ Facture {numero_facture} enregistrée avec succès (ID: {facture.id})")
-        
+
         # Envoyer le fichier PDF
         return send_file(
-            chemin_pdf, 
-            as_attachment=True, 
+            chemin_pdf,
+            as_attachment=True,
             download_name=nom_fichier,
             mimetype='application/pdf'
         )
-        
+
     except ValueError as e:
         db.session.rollback()
         app.logger.error(f"Erreur de validation: {str(e)}")
         return jsonify({'error': f"Erreur de format : {str(e)}"}), 400
-        
+
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Erreur serveur: {str(e)}", exc_info=True)
@@ -2044,10 +2065,10 @@ def generer_facture_client():
 def telecharger_facture(facture_id):
     """Télécharger une facture"""
     facture = Facture.query.get_or_404(facture_id)
-    
+
     if not facture.fichier_pdf or not os.path.exists(facture.fichier_pdf):
         return "Fichier non trouvé", 404
-    
+
     nom_fichier = f"{facture.numero}.pdf"
     return send_file(facture.fichier_pdf, as_attachment=True, download_name=nom_fichier)
 
@@ -2055,10 +2076,10 @@ def telecharger_facture(facture_id):
 def voir_facture(facture_id):
     """Voir une facture dans le navigateur"""
     facture = Facture.query.get_or_404(facture_id)
-    
+
     if not facture.fichier_pdf or not os.path.exists(facture.fichier_pdf):
         return "Fichier non trouvé", 404
-    
+
     return send_file(facture.fichier_pdf, mimetype='application/pdf')
 
 # ============================================================================
@@ -2070,25 +2091,25 @@ def generer_facture_employe():
     """Génère un bulletin de paie pour un employé basé sur ses livraisons"""
     try:
         data = request.json
-        
+
         app.logger.info(f"Génération bulletin employé: {data}")
-        
+
         # Validation des données
         if not data.get('employe_id'):
             return jsonify({'error': 'Employé obligatoire'}), 400
-        
+
         employe = Employe.query.get(data['employe_id'])
         if not employe:
             return jsonify({'error': 'Employé introuvable'}), 404
-        
+
         # Générer le numéro de facture
         numero_facture = generer_numero_facture('employe')
-        
+
         # Récupérer les données
         total_brut = float(data.get('total_brut', 0))
         amendes_ids = data.get('amendes_ids', [])
         livraisons = data.get('livraisons', [])
-        
+
         # Calculer le total des amendes
         total_amendes = 0
         amendes_a_marquer = []
@@ -2098,13 +2119,13 @@ def generer_facture_employe():
                 if amende and amende.statut == 'en_attente':
                     total_amendes += amende.montant
                     amendes_a_marquer.append(amende)
-        
+
         # Calculer le net à payer
         total_net = total_brut - total_amendes
-        
+
         # Préparer les détails pour le PDF
         details = []
-        
+
         # Ajouter les livraisons comme détails
         for livraison in livraisons:
             details.append({
@@ -2113,7 +2134,7 @@ def generer_facture_employe():
                 'prix_unitaire': livraison['montant_jour'],
                 'total': livraison['montant_jour']
             })
-        
+
         # Préparer les données pour le PDF
         pdf_data = {
             'numero_facture': numero_facture,
@@ -2127,17 +2148,17 @@ def generer_facture_employe():
             'total_amendes': total_amendes,
             'notes': data.get('notes', '')
         }
-        
+
         # Générer le nom du fichier PDF
         nom_fichier = f"Bulletin_{numero_facture.replace('/', '_')}_{employe.nom}.pdf"
         chemin_pdf = os.path.join('factures', nom_fichier)
-        
+
         # Créer le dossier si nécessaire
         os.makedirs('factures', exist_ok=True)
-        
+
         # Générer le PDF
         generer_pdf_facture(pdf_data, chemin_pdf, 'employe')
-        
+
         # Sauvegarder la facture en base de données
         facture = Facture(
             numero=numero_facture,
@@ -2155,24 +2176,24 @@ def generer_facture_employe():
             notes=data.get('notes', ''),
             statut='en_attente'
         )
-        
+
         db.session.add(facture)
-        
+
         # Marquer les amendes comme appliquées et les lier à cette facture
         for amende in amendes_a_marquer:
             amende.statut = 'appliquée'
             amende.facture_id = facture.id
-        
+
         db.session.commit()
-        
+
         app.logger.info(f"✅ Bulletin {numero_facture} généré avec succès")
-        
+
         return jsonify({
             'success': True,
             'message': f'Bulletin {numero_facture} généré avec succès',
             'download_url': f'/telecharger_facture/{facture.id}'
         })
-        
+
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Erreur génération bulletin: {e}", exc_info=True)
@@ -2187,7 +2208,7 @@ def generer_facture_employe():
 def employes():
     """Page de gestion des employés"""
     employes_list = Employe.query.order_by(Employe.nom, Employe.prenom).all()
-    
+
     # Statistiques
     for emp in employes_list:
         emp.amendes_en_attente = Amende.query.filter_by(
@@ -2198,7 +2219,7 @@ def employes():
             employe_id=emp.id,
             statut='en_attente'
         ).scalar() or 0
-    
+
     return render_template('employes.html',
                            employes=employes_list,
                            entreprise=VOTRE_ENTREPRISE)
@@ -2208,12 +2229,12 @@ def api_employes():
     """API pour gérer les employés"""
     if request.method == 'POST':
         data = request.json
-        
+
         # Générer automatiquement le matricule si non fourni
         matricule = data.get('matricule')
         if not matricule or matricule.strip() == '':
             matricule = generer_matricule_employe(
-                data['nom'], 
+                data['nom'],
                 data['prenom'],
                 data.get('date_embauche')
             )
@@ -2223,7 +2244,7 @@ def api_employes():
             existing = Employe.query.filter_by(matricule=matricule).first()
             if existing:
                 return jsonify({'error': 'Un employé avec ce matricule existe déjà'}), 400
-        
+
         employe = Employe(
             nom=data['nom'],
             prenom=data['prenom'],
@@ -2234,14 +2255,14 @@ def api_employes():
             email=data.get('email'),
             date_embauche=datetime.strptime(data['date_embauche'], "%Y-%m-%d").date() if data.get('date_embauche') else None
         )
-        
+
         db.session.add(employe)
         db.session.commit()
-        
+
         app.logger.info(f"✅ Employé créé: {employe.nom_complet()} - Matricule: {employe.matricule}")
-        
+
         return jsonify(employe.to_dict()), 201
-    
+
     # GET
     employes_list = Employe.query.order_by(Employe.nom).all()
     return jsonify([e.to_dict() for e in employes_list])
@@ -2250,10 +2271,10 @@ def api_employes():
 def api_employe_detail(employe_id):
     """API pour un employé spécifique"""
     employe = Employe.query.get_or_404(employe_id)
-    
+
     if request.method == 'PUT':
         data = request.json
-        
+
         employe.nom = data.get('nom', employe.nom)
         employe.prenom = data.get('prenom', employe.prenom)
         employe.matricule = data.get('matricule', employe.matricule)
@@ -2262,32 +2283,32 @@ def api_employe_detail(employe_id):
         employe.telephone = data.get('telephone', employe.telephone)
         employe.email = data.get('email', employe.email)
         employe.actif = data.get('actif', employe.actif)
-        
+
         if data.get('date_embauche'):
             employe.date_embauche = datetime.strptime(data['date_embauche'], "%Y-%m-%d").date()
-        
+
         db.session.commit()
         return jsonify(employe.to_dict())
-    
+
     elif request.method == 'DELETE':
         # Récupérer les informations sur les données associées
         factures = Facture.query.filter_by(employe_id=employe.id).all()
         amendes = Amende.query.filter_by(employe_id=employe.id).all()
         livraisons = Livraison.query.filter_by(employe_id=employe.id).all()
-        
+
         nb_factures = len(factures)
         nb_amendes = len(amendes)
         nb_livraisons = len(livraisons)
-        
+
         # ✅ SUPPRIMER TOUTES LES DONNÉES ASSOCIÉES
         # Supprimer les livraisons
         for livraison in livraisons:
             db.session.delete(livraison)
-        
+
         # Supprimer les amendes
         for amende in amendes:
             db.session.delete(amende)
-        
+
         # Supprimer les factures
         for facture in factures:
             # Supprimer le fichier PDF si il existe
@@ -2297,15 +2318,15 @@ def api_employe_detail(employe_id):
                 except:
                     pass
             db.session.delete(facture)
-        
+
         # Supprimer l'employé
         db.session.delete(employe)
         db.session.commit()
-        
+
         app.logger.info(f"✅ Employé {employe.nom_complet()} supprimé avec {nb_factures} factures, {nb_amendes} amendes, {nb_livraisons} livraisons")
-        
+
         return jsonify({
-            'success': True, 
+            'success': True,
             'message': f'Employé supprimé avec succès (avec {nb_factures} factures, {nb_amendes} amendes, {nb_livraisons} livraisons)'
         })
 
@@ -2313,16 +2334,16 @@ def api_employe_detail(employe_id):
 def api_employe_infos_suppression(employe_id):
     """Obtenir les informations détaillées avant suppression d'un employé"""
     employe = Employe.query.get_or_404(employe_id)
-    
+
     # Compter les données associées
     nb_factures = Facture.query.filter_by(employe_id=employe.id).count()
     nb_amendes = Amende.query.filter_by(employe_id=employe.id).count()
     nb_livraisons = Livraison.query.filter_by(employe_id=employe.id).count()
-    
+
     # Calculer les totaux financiers
     factures = Facture.query.filter_by(employe_id=employe.id).all()
     total_factures = sum(f.total_net for f in factures)
-    
+
     return jsonify({
         'employe': employe.to_dict(),
         'nb_factures': nb_factures,
@@ -2340,7 +2361,7 @@ def api_employe_infos_suppression(employe_id):
 def api_amendes():
     """Créer une nouvelle amende"""
     data = request.json
-    
+
     amende = Amende(
         employe_id=int(data['employe_id']),
         montant=float(data['montant']),
@@ -2348,10 +2369,10 @@ def api_amendes():
         date_amende=datetime.strptime(data['date_amende'], "%Y-%m-%d").date(),
         statut='en_attente'
     )
-    
+
     db.session.add(amende)
     db.session.commit()
-    
+
     return jsonify(amende.to_dict()), 201
 
 @app.route('/api/employes/<int:employe_id>/amendes')
@@ -2364,13 +2385,13 @@ def api_employe_amendes(employe_id):
 def api_delete_amende(amende_id):
     """Supprimer une amende"""
     amende = Amende.query.get_or_404(amende_id)
-    
+
     if amende.statut == 'appliquée':
         return jsonify({'error': 'Impossible de supprimer une amende déjà appliquée'}), 400
-    
+
     db.session.delete(amende)
     db.session.commit()
-    
+
     return jsonify({'success': True, 'message': 'Amende supprimée'})
 
 # ============================================================================
@@ -2382,12 +2403,12 @@ def api_delete_amende(amende_id):
 def clients():
     """Page de gestion des clients"""
     clients_list = Client.query.order_by(Client.nom).all()
-    
+
     # Calculer les statistiques
     total_clients = len(clients_list)
     total_factures = sum(len(client.factures) for client in clients_list)
     total_ca = sum(sum(f.total_net for f in client.factures) for client in clients_list)
-    
+
     return render_template('clients.html',
                            clients=clients_list,
                            entreprise=VOTRE_ENTREPRISE,
@@ -2402,11 +2423,11 @@ def clients():
 def factures():
     """Page de gestion des factures"""
     factures_list = Facture.query.order_by(Facture.date_facture.desc()).all()
-    
+
     # Séparer factures clients et employés
     factures_clients = [f for f in factures_list if f.type_facture == 'client']
     factures_employes = [f for f in factures_list if f.type_facture == 'employe']
-    
+
     return render_template('factures.html',
                            factures_clients=factures_clients,
                            factures_employes=factures_employes,
@@ -2430,24 +2451,24 @@ def logs():
     action_filter = request.args.get('action')
     date_debut = request.args.get('date_debut')
     date_fin = request.args.get('date_fin')
-    
+
     # Query de base
     query = Log.query
-    
+
     # Appliquer les filtres
     if user_filter:
         query = query.filter(Log.utilisateur_id == user_filter)
-    
+
     if action_filter:
         query = query.filter(Log.action.like(f'%{action_filter}%'))
-    
+
     if date_debut:
         try:
             date_debut_obj = datetime.strptime(date_debut, '%Y-%m-%d')
             query = query.filter(Log.date >= date_debut_obj)
         except:
             pass
-    
+
     if date_fin:
         try:
             date_fin_obj = datetime.strptime(date_fin, '%Y-%m-%d')
@@ -2456,17 +2477,17 @@ def logs():
             query = query.filter(Log.date < date_fin_obj)
         except:
             pass
-    
+
     # Trier par date décroissante et limiter à 1000 derniers
     logs_list = query.order_by(Log.date.desc()).limit(1000).all()
-    
+
     # Liste des utilisateurs pour le filtre
     utilisateurs = Utilisateur.query.order_by(Utilisateur.username).all()
-    
+
     # Types d'actions uniques
     actions_types = db.session.query(Log.action).distinct().all()
     actions_types = [a[0] for a in actions_types]
-    
+
     return render_template('logs.html',
                            logs=logs_list,
                            utilisateurs=utilisateurs,
@@ -2478,7 +2499,7 @@ def logs():
                            entreprise=VOTRE_ENTREPRISE)
 
 # ============================================================================
-# ROUTES API EXISTANTES
+# ROUTES API EXISTANTES (je vais continuer dans le prochain message)
 # ============================================================================
 
 @app.route('/api/factures/<int:facture_id>/envoyer-email', methods=['POST'])
@@ -2489,22 +2510,22 @@ def api_envoyer_facture_email(facture_id):
         facture = Facture.query.get(facture_id)
         if not facture:
             return jsonify({'error': 'Facture introuvable'}), 404
-        
+
         # Vérifier que le PDF existe
         pdf_path = facture.fichier_pdf  # ✅ CORRECTION: fichier_pdf au lieu de chemin_pdf
         if not pdf_path or not os.path.exists(pdf_path):
             return jsonify({'error': 'Le fichier PDF de la facture est introuvable. Veuillez régénérer la facture.'}), 404
-        
+
         # Envoyer l'email
         success, message = send_facture_email(facture, pdf_path)
-        
+
         if success:
             # Créer un log
             destinataire = facture.client.email if facture.type_facture == 'client' else facture.employe.email
             creer_log('envoi_facture_email',
-                     {'numero_facture': facture.numero, 'destinataire': destinataire},  # ✅ CORRECTION: numero au lieu de numero_facture
-                     current_user)
-            
+                      {'numero_facture': facture.numero, 'destinataire': destinataire},  # ✅ CORRECTION: numero au lieu de numero_facture
+                      current_user)
+
             return jsonify({
                 'success': True,
                 'message': message
@@ -2514,7 +2535,7 @@ def api_envoyer_facture_email(facture_id):
                 'success': False,
                 'error': message
             }), 400
-            
+
     except Exception as e:
         app.logger.error(f"Erreur envoi email facture: {e}")
         return jsonify({'error': str(e)}), 500
