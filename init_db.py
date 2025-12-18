@@ -1,40 +1,64 @@
-from app import app, db, Utilisateur, Client, VOTRE_ENTREPRISE
+#!/usr/bin/env python3
+import os
+import sys
 
-def init_database():
-    with app.app_context():
-        # Créer les tables
-        db.create_all()
+# Forcer l'URL de la base de données
+os.environ['DATABASE_URL'] = 'postgresql://mbeka_user:5G2MXzg6BMstri5qB0pTclTHrUSVm9Ok@dpg-d4vj7jnpm1nc73bprt3g-a.frankfurt-postgres.render.com/mbeka_db'
 
-        # Créer l'utilisateur admin s'il n'existe pas
-        admin = Utilisateur.query.filter_by(username='admin').first()
-        if not admin:
-            admin = Utilisateur(
-                username='admin',
-                email='admin@mbeka.com',
-                nom='Administrateur',
-                prenom='Système',
-                role='admin',
-                actif=True
-            )
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            print("✅ Admin créé")
+from app import app, db
 
-        # Créer votre entreprise comme client
-        entreprise = Client.query.filter_by(nom=VOTRE_ENTREPRISE['nom']).first()
-        if not entreprise:
-            entreprise = Client(
-                nom=VOTRE_ENTREPRISE['nom'],
-                adresse=VOTRE_ENTREPRISE['adresse'],
-                ville=VOTRE_ENTREPRISE['ville'],
-                email=VOTRE_ENTREPRISE['email'],
-                telephone=VOTRE_ENTREPRISE['telephone'],
-                siret=VOTRE_ENTREPRISE['siret']
-            )
-            db.session.add(entreprise)
-            db.session.commit()
-            print("✅ Entreprise créée")
+with app.app_context():
+    print("🔥 RÉINITIALISATION COMPLÈTE DE LA BASE...")
 
-if __name__ == '__main__':
-    init_database()
+    # Force drop de TOUTES les tables
+    db.session.execute('DROP TABLE IF EXISTS permission CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS log CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS amende CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS livraison CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS facture CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS employe CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS client CASCADE')
+    db.session.execute('DROP TABLE IF EXISTS utilisateur CASCADE')
+    db.session.commit()
+    print("✅ Tables supprimées")
+
+    # Recréer les tables
+    db.create_all()
+    print("✅ Tables recréées")
+
+    # Créer l'admin directement
+    from app import Utilisateur, Client, VOTRE_ENTREPRISE
+
+    admin = Utilisateur(
+        username='admin',
+        email='admin@mbeka.com',
+        nom='Administrateur',
+        prenom='Système',
+        role='admin',
+        actif=True
+    )
+    admin.set_password('admin123')
+    db.session.add(admin)
+
+    # Créer aussi le client par défaut
+    votre_entreprise_client = Client(
+        nom=VOTRE_ENTREPRISE['nom'],
+        adresse=VOTRE_ENTREPRISE['adresse'],
+        ville=VOTRE_ENTREPRISE['ville'],
+        email=VOTRE_ENTREPRISE['email'],
+        telephone=VOTRE_ENTREPRISE['telephone'],
+        siret=VOTRE_ENTREPRISE['siret']
+    )
+    db.session.add(votre_entreprise_client)
+
+    db.session.commit()
+    print("✅✅✅ ADMIN CRÉÉ AVEC SUCCÈS !")
+    print("Username: admin")
+    print("Password: admin123")
+
+    # Vérification
+    test = Utilisateur.query.filter_by(username='admin').first()
+    if test:
+        print(f"✓ Vérification: L'admin existe bien dans la base")
+    else:
+        print("❌ ERREUR: Admin non trouvé après création")
