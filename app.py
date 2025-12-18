@@ -76,19 +76,24 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Protection CSRF
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)  # "Remember me" 7 jours
 
 # ✅ Configuration Base de Données - Support PostgreSQL (Production) et SQLite (Développement)
+# ✅ CONFIGURATION CORRECTE POUR RENDER
 if os.environ.get('DATABASE_URL'):
     database_url = os.environ.get('DATABASE_URL')
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    # CORRECTION: Ajouter le paramètre SSL
-    if 'postgresql://' in database_url and '?' not in database_url:
-        database_url += '?sslmode=require'
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print("✅ Mode PRODUCTION - PostgreSQL activé")
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_recycle': 300,
+        'pool_pre_ping': True,
+        'connect_args': {
+            'sslmode': 'require'
+        }
+    }
+    print("✅ Mode PRODUCTION - PostgreSQL avec SSL activé")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {}
     print("✅ Mode DÉVELOPPEMENT - SQLite activé")
-
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -1188,6 +1193,20 @@ def generer_pdf_facture(data, type_facture='client'):
     
     # Retourne 4 valeurs comme attendu par le reste du code
     return buffer, total_brut, (val_final - total_brut if appliquer_tva else 0), val_final
+
+# À LA FIN DE LA FONCTION generer_pdf_facture, remplacez :
+c.save()
+buffer.seek(0)
+
+# Retourne 4 valeurs comme attendu par le reste du code
+return buffer, total_brut, (val_final - total_brut if appliquer_tva else 0), val_final
+
+# PAR :
+c.save()
+buffer.seek(0)
+
+# ✅ RETOUR SIMPLIFIÉ : seulement le buffer
+return buffer
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
 # ============================================================================
@@ -1765,85 +1784,105 @@ def nouvelle_facture_employe():
 # ============================================================================
 
 @app.route('/generer-facture-client', methods=['POST'])
+@login_required
+@comptable_ou_admin_required
 def generer_facture_client():
     try:
-        # 1. Récupération des données
         data = request.form
         client_id = data.get('client_id')
         
-        # Vérification ID valide
         if not client_id:
-            return jsonify({'error': "ID Client manquant"}), 400
+            flash('Veuillez sélectionner un client', 'danger')
+            return redirect(url_for('nouvelle_facture_client'))
             
         client = Client.query.get(int(client_id))
-        if not client: return jsonify({'error': "Client introuvable"}), 404
+        if not client:
+            flash('Client introuvable', 'danger')
+            return redirect(url_for('nouvelle_facture_client'))
 
-        # 2. Construction de la liste des articles
+        # Articles
         details = []
         total_brut = 0
-        index = 1
-        while index < 50:
-            if f'details[{index}][description]' not in data: break
-            try:
-                # Utilisation sécurisée de get avec valeur par défaut 0
-                qte = float(data.get(f'details[{index}][quantite]') or 0)
-                prix = float(data.get(f'details[{index}][prix_ht]') or 0)
-                total = qte * prix
-                
-                details.append({
-                    'description': data[f'details[{index}][description]'],
-                    'quantite': qte, 
-                    'prix_ht': prix,  # Important: clé utilisée par le PDF
-                    'total': total
-                })
-                total_brut += total
-            except ValueError: 
-                pass # Ignore les lignes mal formées
-            index += 1
-            
-        if not details: return jsonify({'error': "Ajoutez au moins un article"}), 400
-
-        # 3. Préparation données PDF (AVEC ADRESSE)
-        numero = data.get('numero_facture', 'TEMP')
-        if numero == 'new': numero = generer_numero_facture('client')
         
+        for i in range(1, 100):
+            description = data.get(f'details[{i}][description]', '').strip()
+            if not description:
+                continue
+                
+            qte = float(data.get(f'details[{i}][quantite]', 0) or 0)
+            prix = float(data.get(f'details[{i}][prix_ht]', 0) or 0)
+            total = qte * prix
+            
+            details.append({
+                'description': description,
+                'quantite': qte,
+                'prix_ht': prix,
+                'total': total
+            })
+            total_brut += total
+
+        if not details:
+            flash('Ajoutez au moins un article', 'danger')
+            return redirect(url_for('nouvelle_facture_client'))
+
+        # Numéro facture
+        numero = generer_numero_facture('client')
+        
+        # TVA
+        appliquer_tva = data.get('appliquer_tva') == 'on'
+        taux_tva = TAUX_TVA
+        montant_tva = total_brut * (taux_tva / 100) if appliquer_tva else 0
+        total_net = total_brut + montant_tva
+
+        # PDF
         pdf_data = {
             'numero_facture': numero,
             'date_facture': datetime.now().strftime('%d/%m/%Y'),
             'destinataire_nom': client.nom,
-            # --- ICI L'AJOUT IMPORTANT ---
-            'destinataire_adresse': client.adresse,
-            'destinataire_ville': client.ville,
-            # -----------------------------
+            'destinataire_adresse': client.adresse or '',
+            'destinataire_ville': client.ville or '',
             'details': details,
             'total_brut': total_brut,
-            'appliquer_tva': data.get('appliquer_tva') == 'on'
+            'appliquer_tva': appliquer_tva
         }
 
-        # 4. Génération PDF
-        pdf_buffer, brut, tva, net = generer_pdf_facture(pdf_data, 'client')
+        pdf_buffer = generer_pdf_facture(pdf_data, 'client')
 
-        # 5. Sauvegarde BDD
-        nom_fichier = f"Facture_{numero}.pdf"
+        # Sauvegarde
+        nom_fichier = f"Facture_{numero.replace('/', '_')}.pdf"
+        chemin_pdf = os.path.join('factures', nom_fichier)
+        
+        os.makedirs('factures', exist_ok=True)
+        
+        with open(chemin_pdf, 'wb') as f:
+            f.write(pdf_buffer.getvalue())
+
         facture = Facture(
-            numero=numero, 
-            type_facture='client', 
+            numero=numero,
+            type_facture='client',
+            date_facture=datetime.now().date(),
+            date_debut=data.get('date_debut'),
+            date_fin=data.get('date_fin'),
             client_id=client.id,
-            date_facture=datetime.now(), 
-            total_brut=brut, 
-            total_net=net,
-            fichier_pdf=nom_fichier, 
-            details_json=json.dumps(details), 
-            statut='en_attente'
+            total_brut=total_brut,
+            total_net=total_net,
+            fichier_pdf=chemin_pdf,
+            details_json=json.dumps(details, ensure_ascii=False),
+            statut='en_attente',
+            statut_paiement='impayee',
+            montant_paye=0.0
         )
+        
         db.session.add(facture)
         db.session.commit()
 
+        flash(f'✅ Facture {numero} générée avec succès !', 'success')
         return send_file(pdf_buffer, as_attachment=True, download_name=nom_fichier, mimetype='application/pdf')
 
     except Exception as e:
-        print(f"ERREUR GENERATION FACTURE: {e}") 
-        return jsonify({'error': f"Erreur serveur: {str(e)}"}), 500
+        db.session.rollback()
+        flash(f'Erreur: {str(e)}', 'danger')
+        return redirect(url_for('nouvelle_facture_client'))
 # ============================================================================
 # ROUTES POUR LES FICHIERS
 # ============================================================================
@@ -1874,14 +1913,13 @@ def voir_facture(facture_id):
 # ============================================================================
 
 @app.route('/generer-facture-employe', methods=['POST'])
+@login_required
+@comptable_ou_admin_required
 def generer_facture_employe():
-    """Génère un bulletin de paie pour un employé basé sur ses livraisons"""
+    """Génère un bulletin de paie pour un employé basé sur les livraisons"""
     try:
         data = request.json
         
-        app.logger.info(f"Génération bulletin employé: {data}")
-        
-        # Validation des données
         if not data.get('employe_id'):
             return jsonify({'error': 'Employé obligatoire'}), 400
         
@@ -1889,77 +1927,59 @@ def generer_facture_employe():
         if not employe:
             return jsonify({'error': 'Employé introuvable'}), 404
         
-        # Générer le numéro de facture
+        # Générer numéro
         numero_facture = generer_numero_facture('employe')
         
-        # Récupérer les données
+        # Données
         total_brut = float(data.get('total_brut', 0))
         amendes_ids = data.get('amendes_ids', [])
         livraisons = data.get('livraisons', [])
         
-        # Calculer le total des amendes
+        # Amendes
         total_amendes = 0
-        amendes_a_marquer = []
-        if amendes_ids:
-            for amende_id in amendes_ids:
-                amende = Amende.query.get(amende_id)
-                if amende and amende.statut == 'en_attente':
-                    total_amendes += amende.montant
-                    amendes_a_marquer.append(amende)
+        for amende_id in amendes_ids:
+            amende = Amende.query.get(amende_id)
+            if amende and amende.statut == 'en_attente':
+                total_amendes += amende.montant
+                amende.statut = 'appliquée'
         
-        # Calculer le net à payer
+        # Total
         total_net = total_brut - total_amendes
         
-        # Préparer les détails pour le PDF
-        details = []
-        
-        # Ajouter les livraisons comme détails
-        for livraison in livraisons:
-            details.append({
-                'description': f"Livraison du {livraison['date_livraison']} - {livraison['nombre_journaux']} journaux",
-                'quantite': 1,
-                'prix_unitaire': livraison['montant_jour'],
-                'total': livraison['montant_jour']
-            })
-        
-        # Préparer les données pour le PDF
+        # PDF
         pdf_data = {
             'numero_facture': numero_facture,
             'date_facture': data.get('date_facture', datetime.now().strftime('%d/%m/%Y')),
-            'date_debut': data.get('date_debut'),
-            'date_fin': data.get('date_fin'),
             'destinataire_nom': employe.nom_complet(),
             'matricule': employe.matricule or 'N/A',
-            'details': details,
+            'details': [{
+                'description': f"Livraison du {l['date_livraison']} - {l['nombre_journaux']} journaux",
+                'quantite': 1,
+                'prix_unitaire': l['montant_jour'],
+                'total': l['montant_jour']
+            } for l in livraisons],
             'total_brut': total_brut,
-            'total_amendes': total_amendes,
-            'notes': data.get('notes', '')
+            'total_amendes': total_amendes
         }
         
-        # Générer le nom du fichier PDF
+        pdf_buffer = generer_pdf_facture(pdf_data, 'employe')
+        
+        # Sauvegarde
         nom_fichier = f"Bulletin_{numero_facture.replace('/', '_')}_{employe.nom}.pdf"
         chemin_pdf = os.path.join('factures', nom_fichier)
         
-        # Créer le dossier si nécessaire
         os.makedirs('factures', exist_ok=True)
         
-        # ==================== CORRECTION ICI ====================
-        # CORRECTION : Appeler avec 2 arguments au lieu de 3
-        pdf_buffer, brut, amendes_calculees, net = generer_pdf_facture(pdf_data, 'employe')
-        
-        # Sauvegarder le PDF dans le fichier
         with open(chemin_pdf, 'wb') as f:
             f.write(pdf_buffer.getvalue())
-        # ==================== FIN CORRECTION ====================
         
-        # Sauvegarder la facture en base de données
         facture = Facture(
             numero=numero_facture,
             type_facture='employe',
             date_facture=datetime.now().date(),
-            date_debut=datetime.strptime(data['date_debut'], "%Y-%m-%d").date() if data.get('date_debut') else None,
-            date_fin=datetime.strptime(data['date_fin'], "%Y-%m-%d").date() if data.get('date_fin') else None,
-            client_id=Client.query.first().id,  # Utilise le premier client (requis par la BDD)
+            date_debut=data.get('date_debut'),
+            date_fin=data.get('date_fin'),
+            client_id=Client.query.first().id,
             employe_id=employe.id,
             total_brut=total_brut,
             total_amendes=total_amendes,
@@ -1967,29 +1987,22 @@ def generer_facture_employe():
             fichier_pdf=chemin_pdf,
             details_json=json.dumps(livraisons, ensure_ascii=False),
             notes=data.get('notes', ''),
-            statut='en_attente'
+            statut='en_attente',
+            statut_paiement='impayee',
+            montant_paye=0.0
         )
         
         db.session.add(facture)
-        
-        # Marquer les amendes comme appliquées et les lier à cette facture
-        for amende in amendes_a_marquer:
-            amende.statut = 'appliquée'
-            amende.facture_id = facture.id
-        
         db.session.commit()
-        
-        app.logger.info(f"✅ Bulletin {numero_facture} généré avec succès")
         
         return jsonify({
             'success': True,
-            'message': f'Bulletin {numero_facture} généré avec succès',
+            'message': f'Bulletin {numero_facture} généré',
             'download_url': f'/telecharger_facture/{facture.id}'
         })
         
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Erreur génération bulletin: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 # ============================================================================
 # ROUTES POUR LES EMPLOYÉS
