@@ -13,13 +13,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from io import BytesIO
 from datetime import datetime, date, timedelta
 import os
 import json
 import shutil
 import glob
-from flask import send_file
 from pathlib import Path
 import csv
 from io import StringIO, BytesIO
@@ -27,18 +25,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import zipfile
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
-#from weasyprint import HTML
-from flask import render_template
-#html = render_template("facture.html", facture=facture)
-#HTML(string=html, base_url=app.root_path).write_pdf(pdf_path)
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-# Création automatique des dossiers nécessaires
-os.makedirs('factures', exist_ok=True)
-os.makedirs('static/images', exist_ok=True)
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M"):
@@ -75,26 +66,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True  # Protection XSS
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Protection CSRF
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)  # "Remember me" 7 jours
 
-# ✅ Configuration Base de Données - Support PostgreSQL (Production) et SQLite (Développement)
-# ✅ CONFIGURATION CORRECTE POUR RENDER
-if os.environ.get('DATABASE_URL'):
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-        'connect_args': {
-            'sslmode': 'require'
-        }
-    }
-    print("✅ Mode PRODUCTION - PostgreSQL avec SSL activé")
-else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {}
-    print("✅ Mode DÉVELOPPEMENT - SQLite activé")
-
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -1006,207 +978,325 @@ TAUX_TVA = 21.0
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
-def generer_pdf_facture(data, type_facture='client'):
-    """VERSION CORRIGÉE : Gère Clients ET Employés + Adresses + Colonnes"""
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
+def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
+    """Génère un PDF de facture avec un design moderne et professionnel"""
+    c = canvas.Canvas(chemin_pdf, pagesize=A4)
     width, height = A4
     
-    # --- COULEURS ---
+    # Couleurs modernes
     BLEU_FONCE = colors.HexColor("#1e3a8a")
     BLEU_CLAIR = colors.HexColor("#3b82f6")
     GRIS_CLAIR = colors.HexColor("#f3f4f6")
+    GRIS_TEXTE = colors.HexColor("#6b7280")
     VERT = colors.HexColor("#10b981")
+    ROUGE = colors.HexColor("#ef4444")
     
-    # --- BANDEAU BLEU ---
+    # --- BANDEAU SUPÉRIEUR COLORÉ ---
     c.setFillColor(BLEU_FONCE)
     c.rect(0, height - 4*cm, width, 4*cm, fill=1, stroke=0)
     
     y = height - 1.5*cm
-
-    # --- LOGO (Correction Import) ---
-    try:
-        # Utilisation de 'app' directement car défini globalement
-        logo_path = os.path.join(app.root_path, 'static', 'images', 'logo.png')
-        if os.path.exists(logo_path):
-            c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
-    except Exception as e:
-        print(f"Logo warning: {e}") 
-
-    # --- INFOS ENTREPRISE (Haut Droit) ---
+    
+    # Logo (sur fond bleu)
+    logo_path = os.path.join('static', 'images', 'logo.png')
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(logo_path, 1.5*cm, y - 1.5*cm, width=5*cm, height=2.5*cm, 
+                       preserveAspectRatio=True, mask='auto')
+        except:
+            pass
+    
+    # Informations entreprise (en blanc sur fond bleu)
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(width - 1.5*cm, y, "MBEKA LOGISTIQUE")
+    c.setFont("Helvetica-Bold", 11)
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["nom"])
     
     c.setFont("Helvetica", 9)
     y -= 0.5*cm
-    c.drawRightString(width - 1.5*cm, y, "Transport & Services")
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["adresse"])
     y -= 0.4*cm
-    c.drawRightString(width - 1.5*cm, y, "contact@mbeka-logistique.com")
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE["ville"])
+    y -= 0.4*cm
+    c.drawRightString(width - 1.5*cm, y, f"Tél: {VOTRE_ENTREPRISE['telephone']}")
+    y -= 0.4*cm
+    c.drawRightString(width - 1.5*cm, y, VOTRE_ENTREPRISE['email'])
     
-    # --- TITRE PRINCIPAL ---
+    # --- TITRE DE LA FACTURE ---
     y = height - 5*cm
+    
+    # Encadré du titre
     c.setFillColor(BLEU_CLAIR)
     c.roundRect(1.5*cm, y - 1.2*cm, 8*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
     
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
-    titre_doc = "FACTURE" if type_facture == 'client' else "BULLETIN DE PAIE"
-    c.drawString(2*cm, y - 0.9*cm, titre_doc)
+    titre = "FACTURE" if type_facture == 'client' else "BULLETIN DE SALAIRE"
+    c.drawString(2*cm, y - 0.9*cm, titre)
     
-    # --- CADRES INFOS & DESTINATAIRE ---
+    # --- INFORMATIONS FACTURE (Encadré) ---
     y -= 2*cm
     
-    # Infos (Gauche)
+    # Encadré gris pour les infos
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(1.5*cm, y - 2.5*cm, 8*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
+    
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(2*cm, y - 0.6*cm, "DÉTAILS")
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica", 9)
-    c.drawString(2*cm, y - 1.2*cm, f"N° : {data.get('numero_facture', '')}")
-    c.drawString(2*cm, y - 1.7*cm, f"Date : {data.get('date_facture', '')}")
+    c.drawString(2*cm, y - 0.6*cm, "INFORMATIONS")
     
-    # Destinataire (Droite)
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.black)
+    c.drawString(2*cm, y - 1.1*cm, f"N° Facture:")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(4*cm, y - 1.1*cm, data['numero_facture'])
+    
+    c.setFont("Helvetica", 9)
+    c.drawString(2*cm, y - 1.6*cm, f"Date:")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(4*cm, y - 1.6*cm, data['date_facture'])
+    
+    if data.get('date_debut') and data.get('date_fin'):
+        try:
+            date_debut_str = data['date_debut']
+            date_fin_str = data['date_fin']
+            
+            if '-' in date_debut_str:
+                date_debut = datetime.strptime(date_debut_str, "%Y-%m-%d")
+                date_fin = datetime.strptime(date_fin_str, "%Y-%m-%d")
+                date_debut_str = date_debut.strftime('%d/%m/%Y')
+                date_fin_str = date_fin.strftime('%d/%m/%Y')
+            
+            c.setFont("Helvetica", 9)
+            c.drawString(2*cm, y - 2.1*cm, f"Période:")
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(4*cm, y - 2.1*cm, f"{date_debut_str} - {date_fin_str}")
+        except:
+            pass
+    
+    # --- CLIENT/EMPLOYÉ (Encadré) ---
     c.setFillColor(GRIS_CLAIR)
     c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
+    
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
+    dest_title = "CLIENT" if type_facture == 'client' else "EMPLOYÉ"
+    c.drawString(width/2 + 0.5*cm, y - 0.6*cm, dest_title)
     
-    # Label dynamique (CLIENT ou EMPLOYÉ)
-    label_dest = "CLIENT" if type_facture == 'client' else "EMPLOYÉ"
-    c.drawString(width/2 + 0.5*cm, y - 0.6*cm, label_dest)
-    
-    c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
-    # Nom du destinataire
-    nom_dest = str(data.get('destinataire_nom', ''))
-    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, nom_dest)
+    c.setFillColor(colors.black)
+    c.drawString(width/2 + 0.5*cm, y - 1.2*cm, data['destinataire_nom'])
     
-    # Adresse (Seulement si présente, ex: pour les clients)
-    c.setFont("Helvetica", 9)
-    adresse = data.get('destinataire_adresse')
-    ville = data.get('destinataire_ville')
+    if type_facture == 'client':
+        c.setFont("Helvetica", 9)
+        if data.get('destinataire_adresse'):
+            c.drawString(width/2 + 0.5*cm, y - 1.7*cm, data['destinataire_adresse'])
+        if data.get('destinataire_ville'):
+            c.drawString(width/2 + 0.5*cm, y - 2.1*cm, data['destinataire_ville'])
+    else:
+        c.setFont("Helvetica", 9)
+        c.drawString(width/2 + 0.5*cm, y - 1.7*cm, f"Matricule: {data.get('matricule', 'N/A')}")
     
-    offset_y = 1.7
-    if adresse:
-        c.drawString(width/2 + 0.5*cm, y - offset_y*cm, str(adresse))
-        offset_y += 0.4
-    if ville:
-        c.drawString(width/2 + 0.5*cm, y - offset_y*cm, str(ville))
-    
-    # Pour les employés, on peut afficher le matricule si pas d'adresse
-    if type_facture == 'employe' and data.get('matricule'):
-        c.drawString(width/2 + 0.5*cm, y - 1.7*cm, f"Matricule: {data.get('matricule')}")
-    
-    # --- TABLEAU DES ARTICLES ---
     y -= 3.5*cm
     
-    # En-tête bleu
+    # --- TABLEAU DES DÉTAILS ---
+    c.setFont("Helvetica-Bold", 10)
     c.setFillColor(BLEU_FONCE)
-    c.roundRect(1.5*cm, y - 0.8*cm, width - 3*cm, 0.8*cm, 0.2*cm, fill=1, stroke=0)
+    header_height = 0.8*cm
+    c.roundRect(1.5*cm, y - header_height, width - 3*cm, header_height, 0.2*cm, fill=1, stroke=0)
+    
+    # Colonnes
+    COL_DESC = 2*cm
+    COL_QTY = 12*cm
+    COL_PRIX = 14.5*cm
+    COL_TOTAL = 17.5*cm
+    
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 9)
     
-    # Colonnes
-    c.drawString(2*cm, y - 0.55*cm, "DESCRIPTION")
-    c.drawRightString(width - 8*cm, y - 0.55*cm, "QTÉ")
-    c.drawRightString(width - 5*cm, y - 0.55*cm, "PRIX UNIT.")
-    c.drawRightString(width - 2*cm, y - 0.55*cm, "TOTAL")
+    if type_facture == 'client':
+        c.drawString(COL_DESC, y - 0.55*cm, "DESCRIPTION")
+        c.drawRightString(COL_QTY + 1.2*cm, y - 0.55*cm, "QTÉ")
+        c.drawRightString(COL_PRIX + 1.2*cm, y - 0.55*cm, "PRIX HT")
+        c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.55*cm, "TOTAL")
+    else:
+        c.drawString(COL_DESC, y - 0.55*cm, "DESCRIPTION")
+        c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.55*cm, "MONTANT")
     
-    y -= 1.1*cm
+    y -= header_height + 0.3*cm
+    
+    # --- LIGNES DES DÉTAILS ---
     c.setFont("Helvetica", 9)
     c.setFillColor(colors.black)
     
-    total_brut = float(data.get('total_brut', 0))
+    total_brut = data.get('total_brut', 0)
+    total_amendes = data.get('total_amendes', 0)
+    
     ligne_index = 0
     
-    for detail in data.get('details', []):
-        # Fond alterné
-        if ligne_index % 2 == 0:
-            c.setFillColor(colors.HexColor("#f9fafb"))
-            c.rect(1.5*cm, y - 0.5*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
-        
-        c.setFillColor(colors.black)
-        
-        desc = detail.get('description', '')
-        qte = detail.get('quantite', 0)
-        
-        # Astuce: On cherche 'prix_ht' (Client) OU 'prix_unitaire' (Employé)
-        # Si aucun des deux, on met 0
-        prix = detail.get('prix_ht')
-        if prix is None:
-            prix = detail.get('prix_unitaire', 0)
-        
-        try: montant = float(detail.get('total', 0))
-        except: montant = 0.0
-            
-        # Affichage
-        c.drawString(2*cm, y, desc[:45])
-        c.drawRightString(width - 8*cm, y, f"{float(qte):.2f}")
-        c.drawRightString(width - 5*cm, y, f"{float(prix):.2f} €")
-        c.drawRightString(width - 2*cm, y, f"{montant:.2f} €")
-        
-        y -= 0.7*cm
-        ligne_index += 1
-        
-        # Nouvelle page si on arrive en bas
-        if y < 4*cm:
-            c.showPage()
-            # Redessiner le bandeau en cas de nouvelle page ? (Optionnel, ici on simplifie)
-            y = height - 2*cm
-
-    # --- TOTAUX ---
-    y -= 0.5*cm
-    appliquer_tva = data.get('appliquer_tva', False)
-    
-    # Calculs finaux
-    if appliquer_tva:
-        tva = total_brut * 0.20 # TVA 20%
-        ttc = total_brut + tva
-        label_final = "NET À PAYER:"
-        val_final = ttc
+    if type_facture == 'client':
+        details = data.get('details', [])
+        for detail in details:
+            if detail.get('description'):
+                # Alternance de couleurs de fond
+                if ligne_index % 2 == 0:
+                    c.setFillColor(colors.HexColor("#f9fafb"))
+                    c.rect(1.5*cm, y - 0.7*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
+                
+                c.setFillColor(colors.black)
+                description = detail['description']
+                if len(description) > 60:
+                    description = description[:57] + "..."
+                c.drawString(COL_DESC, y - 0.45*cm, description)
+                
+                c.drawRightString(COL_QTY + 1.2*cm, y - 0.45*cm, f"{detail.get('quantite', 1):.2f}")
+                c.drawRightString(COL_PRIX + 1.2*cm, y - 0.45*cm, f"{detail.get('prix_ht', 0):.2f} €")
+                c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"{detail.get('total', 0):.2f} €")
+                
+                y -= 0.7*cm
+                ligne_index += 1
     else:
-        # Cas Employé (pas de TVA, mais peut avoir des amendes)
-        total_amendes = float(data.get('total_amendes', 0))
-        if total_amendes > 0:
-            # Afficher les amendes
-            c.setFillColor(colors.red)
-            c.drawRightString(width - 4*cm, y - 0.7*cm, "AMENDES:")
-            c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"- {total_amendes:.2f} €")
+        # Salaire brut
+        c.setFillColor(colors.HexColor("#f9fafb"))
+        c.rect(1.5*cm, y - 0.7*cm, width - 3*cm, 0.65*cm, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.drawString(COL_DESC, y - 0.45*cm, "Salaire brut")
+        c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"{total_brut:.2f} €")
+        y -= 0.7*cm
+        
+        # Amendes
+        amendes = data.get('amendes', [])
+        for amende in amendes:
+            c.setFillColor(ROUGE)
+            c.drawString(COL_DESC, y - 0.45*cm, f"- {amende.get('raison', '')[:50]}")
+            c.drawRightString(COL_TOTAL + 1.5*cm, y - 0.45*cm, f"-{amende.get('montant', 0):.2f} €")
             y -= 0.7*cm
-            
-        val_final = total_brut - total_amendes if type_facture == 'employe' else total_brut
-        label_final = "NET À PAYER:"
-
-    # Cadre Vert du Total
-    c.setFillColor(VERT)
-    c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 1*cm, 0.3*cm, fill=1, stroke=0)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(width - 4*cm, y - 0.9*cm, label_final)
-    c.drawRightString(width - 1.5*cm, y - 0.9*cm, f"{val_final:.2f} €")
-
-    c.save()
-    buffer.seek(0)
     
-    # Retourne 4 valeurs comme attendu par le reste du code
-    return buffer, total_brut, (val_final - total_brut if appliquer_tva else 0), val_final
+    # --- TOTAUX (Encadré coloré) ---
+    y -= 0.5*cm
+    
+    # Récupérer l'option TVA
+    appliquer_tva = data.get('appliquer_tva', True)
+    
+    if type_facture == 'client':
+        if appliquer_tva:
+            # Avec TVA
+            total_tva = total_brut * (TAUX_TVA / 100)
+            total_ttc = total_brut + total_tva
+            
+            # Fond des totaux
+            c.setFillColor(GRIS_CLAIR)
+            c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 2.3*cm, 0.3*cm, fill=1, stroke=0)
+            
+            c.setFont("Helvetica", 10)
+            c.setFillColor(colors.black)
+            c.drawRightString(width - 4*cm, y - 0.7*cm, "Total HT:")
+            c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
+            
+            c.drawRightString(width - 4*cm, y - 1.3*cm, f"TVA ({TAUX_TVA}%):")
+            c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"{total_tva:.2f} €")
+            
+            # Total TTC en grand
+            c.setFillColor(VERT)
+            c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
+            
+            c.setFillColor(colors.white)
+            c.setFont("Helvetica-Bold", 14)
+            c.drawRightString(width - 4*cm, y - 2.2*cm, "Total TTC:")
+            c.drawRightString(width - 1.5*cm, y - 2.2*cm, f"{total_ttc:.2f} €")
+        else:
+            # Sans TVA
+            c.setFillColor(GRIS_CLAIR)
+            c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 1.3*cm, 0.3*cm, fill=1, stroke=0)
+            
+            c.setFillColor(VERT)
+            c.roundRect(width - 9*cm, y - 1.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
+            
+            c.setFillColor(colors.white)
+            c.setFont("Helvetica-Bold", 14)
+            c.drawRightString(width - 4*cm, y - 1.2*cm, "Total HT:")
+            c.drawRightString(width - 1.5*cm, y - 1.2*cm, f"{total_brut:.2f} €")
+            
+            total_ttc = total_brut
+            total_tva = 0
+    else:
+        # Employé
+        total_net = total_brut - total_amendes
+        
+        c.setFillColor(GRIS_CLAIR)
+        c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 2.3*cm, 0.3*cm, fill=1, stroke=0)
+        
+        c.setFont("Helvetica", 10)
+        c.setFillColor(colors.black)
+        c.drawRightString(width - 4*cm, y - 0.7*cm, "Brut:")
+        c.drawRightString(width - 1.5*cm, y - 0.7*cm, f"{total_brut:.2f} €")
+        
+        c.setFillColor(ROUGE)
+        c.drawRightString(width - 4*cm, y - 1.3*cm, "Déductions:")
+        c.drawRightString(width - 1.5*cm, y - 1.3*cm, f"-{total_amendes:.2f} €")
+        
+        c.setFillColor(VERT)
+        c.roundRect(width - 9*cm, y - 2.5*cm, 7.5*cm, 0.7*cm, 0.3*cm, fill=1, stroke=0)
+        
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawRightString(width - 4*cm, y - 2.2*cm, "Net à payer:")
+        c.drawRightString(width - 1.5*cm, y - 2.2*cm, f"{total_net:.2f} €")
+        
+        total_ttc = total_net
+        total_tva = 0
+    
+    y -= 3*cm
+    
+    # --- NOTES ET CONDITIONS ---
+    if data.get('notes'):
+        c.setStrokeColor(BLEU_CLAIR)
+        c.setLineWidth(2)
+        c.line(1.5*cm, y, width - 1.5*cm, y)
+        y -= 0.7*cm
+        
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColor(BLEU_FONCE)
+        c.drawString(1.5*cm, y, "NOTES / OBSERVATIONS:")
+        y -= 0.5*cm
+        
+        c.setFont("Helvetica", 9)
+        c.setFillColor(GRIS_TEXTE)
+        notes_text = data['notes']
+        
+        # Découper en lignes
+        max_chars = 95
+        lignes = []
+        while len(notes_text) > max_chars:
+            pos = notes_text[:max_chars].rfind(' ')
+            if pos == -1:
+                pos = max_chars
+            lignes.append(notes_text[:pos])
+            notes_text = notes_text[pos:].strip()
+        if notes_text:
+            lignes.append(notes_text)
+        
+        for ligne in lignes[:8]:
+            c.drawString(1.5*cm, y, ligne)
+            y -= 0.45*cm
+    
+    # --- PIED DE PAGE ---
+    c.setFillColor(GRIS_CLAIR)
+    c.rect(0, 0, width, 2*cm, fill=1, stroke=0)
+    
+    c.setFont("Helvetica", 8)
+    c.setFillColor(GRIS_TEXTE)
+    if type_facture == 'client':
+        c.drawCentredString(width/2, 1.2*cm, f"IBAN: {VOTRE_ENTREPRISE['iban']} • SIRET: {VOTRE_ENTREPRISE['siret']}")
+        c.drawCentredString(width/2, 0.7*cm, f"Paiement à 30 jours • Facture émise le {datetime.now().strftime('%d/%m/%Y')}")
+    else:
+        c.drawCentredString(width/2, 1*cm, f"Document émis le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
+    
+    c.save()
 
-# À LA FIN DE LA FONCTION generer_pdf_facture, remplacez :
-c.save()
-buffer.seek(0)
-
-# Retourne 4 valeurs comme attendu par le reste du code
-return buffer, total_brut, (val_final - total_brut if appliquer_tva else 0), val_final
-
-# PAR :
-c.save()
-buffer.seek(0)
-
-# ✅ RETOUR SIMPLIFIÉ : seulement le buffer
-return buffer
+    return total_brut, total_tva, total_ttc
+    #else:
+    #return total_brut, total_amendes, total_net
+    
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
 # ============================================================================
@@ -1784,105 +1874,164 @@ def nouvelle_facture_employe():
 # ============================================================================
 
 @app.route('/generer-facture-client', methods=['POST'])
-@login_required
-@comptable_ou_admin_required
 def generer_facture_client():
+    """Génère une facture pour un client - VERSION CORRIGÉE"""
     try:
+        # Récupérer les données du formulaire
         data = request.form
-        client_id = data.get('client_id')
         
-        if not client_id:
-            flash('Veuillez sélectionner un client', 'danger')
-            return redirect(url_for('nouvelle_facture_client'))
-            
-        client = Client.query.get(int(client_id))
+        # ✅ VALIDATION : Vérifier que client_id est valide
+        client_id_str = data.get('client_id', '').strip()
+        
+        if not client_id_str or not client_id_str.isdigit():
+            app.logger.error(f"Client ID invalide: {client_id_str}")
+            return jsonify({'error': "Veuillez sélectionner un client valide"}), 400
+        
+        client_id = int(client_id_str)
+        client = Client.query.get(client_id)
+        
         if not client:
-            flash('Client introuvable', 'danger')
-            return redirect(url_for('nouvelle_facture_client'))
-
-        # Articles
-        details = []
+            app.logger.error(f"Client non trouvé: {client_id}")
+            return jsonify({'error': "Client non trouvé"}), 404
+        
+        # Créer le dossier factures s'il n'existe pas
+        os.makedirs('factures', exist_ok=True)
+        
+        # Générer un numéro de facture automatique
+        numero_facture = data.get('numero_facture', '').strip()
+        if not numero_facture or numero_facture.lower() == 'new':
+            numero_facture = generer_numero_facture('client')
+        
+        app.logger.info(f"Génération facture {numero_facture} pour client {client.nom}")
+        
+        # ✅ CORRECTION CRITIQUE : Lecture dynamique de TOUS les articles
         total_brut = 0
+        details = []
         
-        for i in range(1, 100):
-            description = data.get(f'details[{i}][description]', '').strip()
-            if not description:
-                continue
-                
-            qte = float(data.get(f'details[{i}][quantite]', 0) or 0)
-            prix = float(data.get(f'details[{i}][prix_ht]', 0) or 0)
-            total = qte * prix
+        index = 1
+        max_articles = 100  # Limite de sécurité
+        
+        while index <= max_articles:
+            description_key = f'details[{index}][description]'
             
-            details.append({
-                'description': description,
-                'quantite': qte,
-                'prix_ht': prix,
-                'total': total
-            })
-            total_brut += total
-
-        if not details:
-            flash('Ajoutez au moins un article', 'danger')
-            return redirect(url_for('nouvelle_facture_client'))
-
-        # Numéro facture
-        numero = generer_numero_facture('client')
+            # Si la clé n'existe pas, on arrête
+            if description_key not in data:
+                break
+            
+            description = data.get(description_key, '').strip()
+            
+            # Si la description existe et n'est pas vide
+            if description:
+                try:
+                    quantite = float(data.get(f'details[{index}][quantite]', 0))
+                    prix_ht = float(data.get(f'details[{index}][prix_ht]', 0))
+                    total = quantite * prix_ht
+                    
+                    details.append({
+                        'description': description,
+                        'quantite': quantite,
+                        'prix_ht': prix_ht,
+                        'total': total
+                    })
+                    total_brut += total
+                    
+                    app.logger.info(f"Article {index}: {description} - {quantite} x {prix_ht}€ = {total}€")
+                    
+                except (ValueError, TypeError) as e:
+                    app.logger.warning(f"Erreur article {index}: {e}")
+                    # On continue avec les autres articles
+                    pass
+            
+            index += 1
         
-        # TVA
+        # ✅ VALIDATION : Au moins un article
+        if not details:
+            app.logger.error("Aucun article valide trouvé")
+            return jsonify({'error': "Veuillez ajouter au moins un article valide avec une description"}), 400
+        
+        app.logger.info(f"Total: {len(details)} articles, {total_brut}€ HT")
+        
+        # ✅ RÉCUPÉRER LES NOTES ET RÉCLAMATIONS
+        notes = data.get('notes', '').strip()
+        reclamation = data.get('reclamation', '').strip()
+        
+        # Combiner notes et réclamation pour l'affichage
+        notes_completes = ""
+        if notes:
+            notes_completes += f"NOTES: {notes}"
+        if reclamation:
+            if notes_completes:
+                notes_completes += "\n\n"
+            notes_completes += f"RÉCLAMATION: {reclamation}"
+        
+        # ✅ Récupérer l'option TVA
         appliquer_tva = data.get('appliquer_tva') == 'on'
-        taux_tva = TAUX_TVA
-        montant_tva = total_brut * (taux_tva / 100) if appliquer_tva else 0
-        total_net = total_brut + montant_tva
-
-        # PDF
+        
+        # Préparer les données pour le PDF
         pdf_data = {
-            'numero_facture': numero,
-            'date_facture': datetime.now().strftime('%d/%m/%Y'),
+            'numero_facture': numero_facture,
+            'date_facture': data.get('date_facture', datetime.now().strftime('%d/%m/%Y')),
+            'date_debut': data.get('date_debut'),
+            'date_fin': data.get('date_fin'),
             'destinataire_nom': client.nom,
             'destinataire_adresse': client.adresse or '',
             'destinataire_ville': client.ville or '',
             'details': details,
             'total_brut': total_brut,
-            'appliquer_tva': appliquer_tva
+            'notes': notes_completes,  # ✅ Notes complètes avec réclamation
+            'appliquer_tva': appliquer_tva  # ✅ Option TVA
         }
-
-        pdf_buffer = generer_pdf_facture(pdf_data, 'client')
-
-        # Sauvegarde
-        nom_fichier = f"Facture_{numero.replace('/', '_')}.pdf"
+        
+        # Générer le nom du fichier PDF
+        nom_fichier = f"Facture_{numero_facture.replace('/', '_')}.pdf"
         chemin_pdf = os.path.join('factures', nom_fichier)
         
-        os.makedirs('factures', exist_ok=True)
+        app.logger.info(f"Génération PDF: {chemin_pdf}")
         
-        with open(chemin_pdf, 'wb') as f:
-            f.write(pdf_buffer.getvalue())
-
+        # Générer le PDF
+        total_ht, total_tva, total_ttc = generer_pdf_facture(pdf_data, chemin_pdf, 'client')
+        
+        app.logger.info(f"PDF généré: HT={total_ht}€, TVA={total_tva}€, TTC={total_ttc}€")
+        
+        # ✅ SAUVEGARDER EN BASE DE DONNÉES
         facture = Facture(
-            numero=numero,
+            numero=numero_facture,
             type_facture='client',
-            date_facture=datetime.now().date(),
-            date_debut=data.get('date_debut'),
-            date_fin=data.get('date_fin'),
+            date_facture=datetime.strptime(pdf_data['date_facture'], "%d/%m/%Y").date(),
+            date_debut=datetime.strptime(data['date_debut'], "%Y-%m-%d").date() if data.get('date_debut') else None,
+            date_fin=datetime.strptime(data['date_fin'], "%Y-%m-%d").date() if data.get('date_fin') else None,
             client_id=client.id,
             total_brut=total_brut,
-            total_net=total_net,
+            total_net=total_ttc,
             fichier_pdf=chemin_pdf,
             details_json=json.dumps(details, ensure_ascii=False),
-            statut='en_attente',
-            statut_paiement='impayee',
-            montant_paye=0.0
+            notes=notes_completes,  # ✅ Sauvegarder les notes complètes
+            statut='en_attente'
         )
         
         db.session.add(facture)
         db.session.commit()
-
-        flash(f'✅ Facture {numero} générée avec succès !', 'success')
-        return send_file(pdf_buffer, as_attachment=True, download_name=nom_fichier, mimetype='application/pdf')
-
+        
+        app.logger.info(f"✅ Facture {numero_facture} enregistrée avec succès (ID: {facture.id})")
+        
+        # Envoyer le fichier PDF
+        return send_file(
+            chemin_pdf, 
+            as_attachment=True, 
+            download_name=nom_fichier,
+            mimetype='application/pdf'
+        )
+        
+    except ValueError as e:
+        db.session.rollback()
+        app.logger.error(f"Erreur de validation: {str(e)}")
+        return jsonify({'error': f"Erreur de format : {str(e)}"}), 400
+        
     except Exception as e:
         db.session.rollback()
-        flash(f'Erreur: {str(e)}', 'danger')
-        return redirect(url_for('nouvelle_facture_client'))
+        app.logger.error(f"Erreur serveur: {str(e)}", exc_info=True)
+        return jsonify({'error': f"Erreur lors de la génération: {str(e)}"}), 500
+
 # ============================================================================
 # ROUTES POUR LES FICHIERS
 # ============================================================================
@@ -1913,13 +2062,14 @@ def voir_facture(facture_id):
 # ============================================================================
 
 @app.route('/generer-facture-employe', methods=['POST'])
-@login_required
-@comptable_ou_admin_required
 def generer_facture_employe():
-    """Génère un bulletin de paie pour un employé basé sur les livraisons"""
+    """Génère un bulletin de paie pour un employé basé sur ses livraisons"""
     try:
         data = request.json
         
+        app.logger.info(f"Génération bulletin employé: {data}")
+        
+        # Validation des données
         if not data.get('employe_id'):
             return jsonify({'error': 'Employé obligatoire'}), 400
         
@@ -1927,59 +2077,71 @@ def generer_facture_employe():
         if not employe:
             return jsonify({'error': 'Employé introuvable'}), 404
         
-        # Générer numéro
+        # Générer le numéro de facture
         numero_facture = generer_numero_facture('employe')
         
-        # Données
+        # Récupérer les données
         total_brut = float(data.get('total_brut', 0))
         amendes_ids = data.get('amendes_ids', [])
         livraisons = data.get('livraisons', [])
         
-        # Amendes
+        # Calculer le total des amendes
         total_amendes = 0
-        for amende_id in amendes_ids:
-            amende = Amende.query.get(amende_id)
-            if amende and amende.statut == 'en_attente':
-                total_amendes += amende.montant
-                amende.statut = 'appliquée'
+        amendes_a_marquer = []
+        if amendes_ids:
+            for amende_id in amendes_ids:
+                amende = Amende.query.get(amende_id)
+                if amende and amende.statut == 'en_attente':
+                    total_amendes += amende.montant
+                    amendes_a_marquer.append(amende)
         
-        # Total
+        # Calculer le net à payer
         total_net = total_brut - total_amendes
         
-        # PDF
+        # Préparer les détails pour le PDF
+        details = []
+        
+        # Ajouter les livraisons comme détails
+        for livraison in livraisons:
+            details.append({
+                'description': f"Livraison du {livraison['date_livraison']} - {livraison['nombre_journaux']} journaux",
+                'quantite': 1,
+                'prix_unitaire': livraison['montant_jour'],
+                'total': livraison['montant_jour']
+            })
+        
+        # Préparer les données pour le PDF
         pdf_data = {
             'numero_facture': numero_facture,
             'date_facture': data.get('date_facture', datetime.now().strftime('%d/%m/%Y')),
+            'date_debut': data.get('date_debut'),
+            'date_fin': data.get('date_fin'),
             'destinataire_nom': employe.nom_complet(),
             'matricule': employe.matricule or 'N/A',
-            'details': [{
-                'description': f"Livraison du {l['date_livraison']} - {l['nombre_journaux']} journaux",
-                'quantite': 1,
-                'prix_unitaire': l['montant_jour'],
-                'total': l['montant_jour']
-            } for l in livraisons],
+            'details': details,
             'total_brut': total_brut,
-            'total_amendes': total_amendes
+            'total_amendes': total_amendes,
+            'notes': data.get('notes', '')
         }
         
-        pdf_buffer = generer_pdf_facture(pdf_data, 'employe')
-        
-        # Sauvegarde
+        # Générer le nom du fichier PDF
         nom_fichier = f"Bulletin_{numero_facture.replace('/', '_')}_{employe.nom}.pdf"
         chemin_pdf = os.path.join('factures', nom_fichier)
         
+        # Créer le dossier si nécessaire
         os.makedirs('factures', exist_ok=True)
         
-        with open(chemin_pdf, 'wb') as f:
-            f.write(pdf_buffer.getvalue())
+        # Générer le PDF
+        generer_pdf_facture(pdf_data, chemin_pdf, 'employe')
         
+        # Sauvegarder la facture en base de données
         facture = Facture(
             numero=numero_facture,
             type_facture='employe',
             date_facture=datetime.now().date(),
-            date_debut=data.get('date_debut'),
-            date_fin=data.get('date_fin'),
-            client_id=Client.query.first().id,
+            date_debut=datetime.strptime(data['date_debut'], "%Y-%m-%d").date() if data.get('date_debut') else None,
+            date_fin=datetime.strptime(data['date_fin'], "%Y-%m-%d").date() if data.get('date_fin') else None,
+            client_id=Client.query.first().id,  # Utilise le premier client (requis par la BDD)
             employe_id=employe.id,
             total_brut=total_brut,
             total_amendes=total_amendes,
@@ -1987,23 +2149,31 @@ def generer_facture_employe():
             fichier_pdf=chemin_pdf,
             details_json=json.dumps(livraisons, ensure_ascii=False),
             notes=data.get('notes', ''),
-            statut='en_attente',
-            statut_paiement='impayee',
-            montant_paye=0.0
+            statut='en_attente'
         )
         
         db.session.add(facture)
+        
+        # Marquer les amendes comme appliquées et les lier à cette facture
+        for amende in amendes_a_marquer:
+            amende.statut = 'appliquée'
+            amende.facture_id = facture.id
+        
         db.session.commit()
+        
+        app.logger.info(f"✅ Bulletin {numero_facture} généré avec succès")
         
         return jsonify({
             'success': True,
-            'message': f'Bulletin {numero_facture} généré',
+            'message': f'Bulletin {numero_facture} généré avec succès',
             'download_url': f'/telecharger_facture/{facture.id}'
         })
         
     except Exception as e:
         db.session.rollback()
+        app.logger.error(f"Erreur génération bulletin: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
 # ============================================================================
 # ROUTES POUR LES EMPLOYÉS
 # ============================================================================
@@ -4075,15 +4245,6 @@ def auto_backup():
             app.logger.info(f"✅ Sauvegarde automatique créée : {backup_filename}")
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
-        
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Route de vérification de santé pour Render"""
-    return jsonify({
-        'status': 'healthy',
-        'service': 'Mbeka Facturation',
-        'timestamp': datetime.now().isoformat()
-    })
 
 if __name__ == '__main__':
     # ============================================================================
@@ -4154,58 +4315,5 @@ if __name__ == '__main__':
     print("="*60)
     
     
-# ============================================================================
-# INITIALISATION AUTOMATIQUE DE LA BASE DE DONNÉES
-# ============================================================================
-
-def init_database():
-    """Initialise la base de données et crée un admin par défaut si nécessaire"""
-    with app.app_context():
-        try:
-            # Créer toutes les tables
-            db.create_all()
-            print("✅ Tables de base de données créées")
-            
-            # Vérifier si un admin existe déjà
-            admin_exists = Utilisateur.query.filter_by(role='admin').first()
-            
-            if not admin_exists:
-                # Créer l'utilisateur admin par défaut
-                admin = Utilisateur(
-                    username='admin',
-                    email='admin@mbeka.com',
-                    role='admin',
-                    actif=True
-                )
-                admin.set_password('Admin2024!')
-                
-                db.session.add(admin)
-                db.session.commit()
-                
-                print("=" * 60)
-                print("✅ UTILISATEUR ADMIN CRÉÉ AUTOMATIQUEMENT !")
-                print("=" * 60)
-                print("🔑 Username: admin")
-                print("🔑 Password: Admin2024!")
-                print("=" * 60)
-                print("⚠️  IMPORTANT: Changez ce mot de passe après la première connexion !")
-                print("=" * 60)
-            else:
-                print("ℹ️  Un administrateur existe déjà - Connexion disponible")
-        except Exception as e:
-            print(f"❌ Erreur lors de l'initialisation de la base de données: {e}")
-
-# Initialiser la base de données au démarrage (important pour Render)
-# init_database()
-print("🔄 Initialisation de la base de données...")
-init_database()
-print("✅ Base de données initialisée")
-
-
-# Si on exécute le fichier directement (python app.py)
-if __name__ == '__main__':
-    print("🚀 Démarrage local du serveur...")
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
-else:
-    print("✅ Application prête pour gunicorn (Render)")
+    # Ceci est la dernière ligne, elle DOIT être atteinte pour lancer le serveur
+    app.run(debug=True, host='0.0.0.0', port=5000)
