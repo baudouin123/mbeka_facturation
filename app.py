@@ -4270,6 +4270,58 @@ def auto_backup():
             app.logger.info(f"✅ Sauvegarde automatique créée : {backup_filename}")
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
+        
+# ============================================================================
+# ROUTE TEMPORAIRE POUR CRÉER L'ADMIN - À AJOUTER DANS APP.PY
+# ============================================================================
+
+@app.route('/create-emergency-admin-xyz789')
+def create_emergency_admin():
+    """Route d'urgence pour créer l'admin - À SUPPRIMER après utilisation"""
+    try:
+        # Supprimer l'ancien admin s'il existe
+        old_admin = Utilisateur.query.filter_by(username='admin').first()
+        if old_admin:
+            db.session.delete(old_admin)
+            db.session.commit()
+        
+        # Créer le nouvel admin
+        admin = Utilisateur(
+            username='admin',
+            email='admin@mbeka.com',
+            nom='Administrateur',
+            prenom='Système',
+            role='admin',
+            actif=True
+        )
+        admin.set_password('Admin2024!')
+        db.session.add(admin)
+        db.session.commit()
+        
+        return """
+        <html>
+        <body style="font-family: Arial; padding: 50px; background: #f0f0f0;">
+            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: green;">✅ ADMIN CRÉÉ AVEC SUCCÈS !</h1>
+                <hr>
+                <p><strong>Username:</strong> admin</p>
+                <p><strong>Password:</strong> Admin2024!</p>
+                <hr>
+                <p>⚠️ <strong>IMPORTANT:</strong> Supprimez cette route de votre code après utilisation !</p>
+                <p><a href="/login" style="background: blue; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Aller à la page de connexion</a></p>
+            </div>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+        <body style="font-family: Arial; padding: 50px;">
+            <h1 style="color: red;">❌ ERREUR</h1>
+            <p>{str(e)}</p>
+        </body>
+        </html>
+        """
 
 if __name__ == '__main__':
     # ============================================================================
