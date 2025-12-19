@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord - Mbeka Facturation</title>
+    <title>Tableau de Bord - {{ entreprise.nom }} Facturation</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -12,7 +12,7 @@
         <!-- En-tête -->
         <header class="header">
             <div class="logo-section">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo {{ entreprise.nom }}" class="logo-large">
                 <div class="logo-text">
                     <h1><i class="fas fa-chart-line"></i> Tableau de Bord</h1>
                     <p class="subtitle">Gestion complète des factures clients et salariés</p>
@@ -23,6 +23,16 @@
                     <h3>{{ entreprise.nom }}</h3>
                     <p><i class="fas fa-map-marker-alt"></i> {{ entreprise.ville }}</p>
                     <p><i class="fas fa-phone"></i> {{ entreprise.telephone }}</p>
+                </div>
+                <div class="user-info">
+                    {% if current_user.is_authenticated %}
+                    <span class="user-greeting">
+                        <i class="fas fa-user-circle"></i> Bonjour, {{ current_user.prenom or current_user.username }}
+                    </span>
+                    <a href="{{ url_for('logout') }}" class="btn-logout">
+                        <i class="fas fa-sign-out-alt"></i> Déconnexion
+                    </a>
+                    {% endif %}
                 </div>
             </div>
         </header>
@@ -62,8 +72,24 @@
             <a href="{{ url_for('logs') }}" class="nav-link">
                  <i class="fas fa-list-alt"></i> Logs
             </a>
-
+            <a href="{{ url_for('utilisateurs') }}" class="nav-link">
+                 <i class="fas fa-users-cog"></i> Utilisateurs
+            </a>
         </nav>
+
+        <!-- Messages flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-circle{% elif category == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
 
         <main class="main-content">
             <!-- Cartes de statistiques -->
@@ -75,6 +101,7 @@
                     <div class="stat-content">
                         <h3>{{ stats.total_clients }}</h3>
                         <p>Clients</p>
+                        <a href="{{ url_for('clients') }}" class="stat-link">Voir la liste →</a>
                     </div>
                 </div>
                 
@@ -85,6 +112,7 @@
                     <div class="stat-content">
                         <h3>{{ stats.total_employes }}</h3>
                         <p>Employés</p>
+                        <a href="{{ url_for('employes') }}" class="stat-link">Voir la liste →</a>
                     </div>
                 </div>
                 
@@ -95,6 +123,7 @@
                     <div class="stat-content">
                         <h3>{{ stats.total_factures }}</h3>
                         <p>Factures</p>
+                        <a href="{{ url_for('factures') }}" class="stat-link">Voir la liste →</a>
                     </div>
                 </div>
                 
@@ -105,6 +134,7 @@
                     <div class="stat-content">
                         <h3>{{ stats.factures_en_attente }}</h3>
                         <p>En attente</p>
+                        <a href="{{ url_for('factures') }}?statut=en_attente" class="stat-link">Voir les détails →</a>
                     </div>
                 </div>
             </div>
@@ -121,6 +151,7 @@
                             <div class="action-content">
                                 <h3>Nouvelle Facture Client</h3>
                                 <p>Créer une facture pour un client</p>
+                                <span class="action-shortcut">⌘ + N</span>
                             </div>
                         </a>
                         
@@ -131,6 +162,7 @@
                             <div class="action-content">
                                 <h3>Nouvelle Facture Employé</h3>
                                 <p>Créer un bulletin de salaire</p>
+                                <span class="action-shortcut">⌘ + E</span>
                             </div>
                         </a>
                         
@@ -141,6 +173,7 @@
                             <div class="action-content">
                                 <h3>Ajouter un Employé</h3>
                                 <p>Enregistrer un nouvel employé</p>
+                                <span class="action-shortcut">⌘ + ⇧ + E</span>
                             </div>
                         </a>
                         
@@ -151,6 +184,7 @@
                             <div class="action-content">
                                 <h3>Ajouter un Client</h3>
                                 <p>Enregistrer un nouveau client</p>
+                                <span class="action-shortcut">⌘ + ⇧ + C</span>
                             </div>
                         </a>
                     </div>
@@ -185,7 +219,7 @@
                                         {% for amende in amendes_en_attente[:5] %}
                                         <tr>
                                             <td>{{ amende.employe.nom_complet() if amende.employe else 'N/A' }}</td>
-                                            <td>{{ amende.raison[:30] }}...</td>
+                                            <td><span class="raison-text" title="{{ amende.raison }}">{{ amende.raison[:30] }}...</span></td>
                                             <td class="text-danger">-{{ amende.montant }} €</td>
                                             <td>{{ amende.date_amende.strftime('%d/%m/%Y') }}</td>
                                         </tr>
@@ -207,6 +241,71 @@
                             </div>
                         {% endif %}
                     </div>
+                </div>
+            </div>
+
+            <!-- Dernières factures -->
+            <div class="section-card">
+                <h2><i class="fas fa-history"></i> Dernières Factures</h2>
+                <div class="recent-invoices">
+                    {% if factures_recentes %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Numéro</th>
+                                    <th>Client/Employé</th>
+                                    <th>Date</th>
+                                    <th>Montant</th>
+                                    <th>Statut</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for facture in factures_recentes %}
+                                <tr>
+                                    <td><strong>#{{ facture.numero }}</strong></td>
+                                    <td>
+                                        {% if facture.client %}
+                                            {{ facture.client.nom }}
+                                        {% elif facture.employe %}
+                                            {{ facture.employe.nom_complet() }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ facture.date_facture.strftime('%d/%m/%Y') }}</td>
+                                    <td class="text-success">{{ facture.total }} €</td>
+                                    <td>
+                                        {% if facture.statut == 'payee' %}
+                                            <span class="badge badge-success">Payée</span>
+                                        {% elif facture.statut == 'en_attente' %}
+                                            <span class="badge badge-warning">En attente</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">{{ facture.statut }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('voir_facture', id=facture.id) }}" class="btn-view">
+                                            <i class="fas fa-eye"></i> Voir
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('factures') }}" class="btn-secondary">
+                            Voir toutes les factures
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="empty-state-small">
+                        <i class="fas fa-receipt fa-3x"></i>
+                        <p>Aucune facture récente</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -244,6 +343,7 @@
         <footer class="footer">
             <p>&copy; {{ now.year }} {{ entreprise.nom }} - Système de facturation avec gestion des amendes</p>
             <p>Dernière mise à jour : {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
+            <p class="system-info">Version 1.0.0 | Utilisateur connecté : {{ current_user.username }}</p>
         </footer>
     </div>
 
@@ -278,6 +378,11 @@
             border-radius: 12px;
             border: 4px solid white;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s;
+        }
+        
+        .logo-large:hover {
+            transform: scale(1.05);
         }
         
         .logo-text h1 {
@@ -294,9 +399,17 @@
             margin-top: 8px;
         }
         
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 15px;
+        }
+        
         .entreprise-info h3 {
             margin: 0 0 10px 0;
             font-size: 20px;
+            text-align: right;
         }
         
         .entreprise-info p {
@@ -306,6 +419,39 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-greeting {
+            font-size: 14px;
+            color: #ECF0F1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-logout {
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-logout:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
         }
         
         .main-nav {
@@ -330,6 +476,7 @@
             font-size: 16px;
             transition: all 0.3s;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            position: relative;
         }
         
         .nav-link:hover {
@@ -341,6 +488,67 @@
         .nav-link.active {
             background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%);
             color: white;
+        }
+        
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 3px;
+            background: #3498DB;
+            border-radius: 2px;
+        }
+        
+        .flash-messages {
+            margin-bottom: 25px;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
         }
         
         .stats-grid {
@@ -359,6 +567,18 @@
             gap: 25px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
             transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: inherit;
         }
         
         .stat-card:hover {
@@ -390,6 +610,21 @@
             margin: 5px 0 0 0;
         }
         
+        .stat-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #3498DB;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .stat-link:hover {
+            color: #2980b9;
+            transform: translateX(5px);
+        }
+        
         .quick-actions-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -408,6 +643,11 @@
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s;
+        }
+        
+        .section-card:hover {
+            transform: translateY(-3px);
         }
         
         .section-card h2 {
@@ -436,6 +676,7 @@
             gap: 20px;
             transition: all 0.3s;
             border: 2px solid transparent;
+            position: relative;
         }
         
         .action-card:hover {
@@ -465,6 +706,17 @@
             margin: 0;
             color: #7f8c8d;
             font-size: 14px;
+        }
+        
+        .action-shortcut {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #7f8c8d;
         }
         
         .amendes-list {
@@ -499,6 +751,15 @@
             font-weight: 600;
         }
         
+        .text-success {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        
+        .raison-text {
+            cursor: help;
+        }
+        
         .empty-state-small {
             text-align: center;
             padding: 40px 20px;
@@ -508,6 +769,48 @@
         .empty-state-small i {
             margin-bottom: 15px;
             color: #2ecc71;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-secondary {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        .btn-view {
+            background: #3498DB;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
+        }
+        
+        .btn-view:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
         }
         
         .btn-secondary {
@@ -526,6 +829,10 @@
             transform: translateY(-2px);
         }
         
+        .recent-invoices {
+            margin-top: 20px;
+        }
+        
         .instructions-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -539,6 +846,11 @@
             background: #f8f9fa;
             border-radius: 12px;
             position: relative;
+            transition: transform 0.3s;
+        }
+        
+        .instruction-step:hover {
+            transform: translateY(-5px);
         }
         
         .step-number {
@@ -583,6 +895,11 @@
             margin: 5px 0;
         }
         
+        .system-info {
+            font-size: 12px;
+            color: #95a5a6;
+        }
+        
         .text-center {
             text-align: center;
         }
@@ -602,6 +919,19 @@
                 flex-direction: column;
             }
             
+            .header-info {
+                align-items: center;
+                text-align: center;
+            }
+            
+            .entreprise-info h3 {
+                text-align: center;
+            }
+            
+            .entreprise-info p {
+                justify-content: center;
+            }
+            
             .main-nav {
                 flex-direction: column;
             }
@@ -614,7 +944,142 @@
             .actions-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .quick-actions-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
+
+    <script>
+        // Raccourcis clavier
+        document.addEventListener('keydown', function(e) {
+            // Détecter si ctrl/cmd est pressé
+            const isCtrl = e.ctrlKey || e.metaKey;
+            
+            if (isCtrl) {
+                switch(e.key.toLowerCase()) {
+                    case 'n':
+                        e.preventDefault();
+                        window.location.href = "{{ url_for('nouvelle_facture_client') }}";
+                        break;
+                    case 'e':
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            window.location.href = "{{ url_for('employes') }}";
+                        } else {
+                            window.location.href = "{{ url_for('nouvelle_facture_employe') }}";
+                        }
+                        break;
+                    case 'c':
+                        if (e.shiftKey) {
+                            e.preventDefault();
+                            window.location.href = "{{ url_for('clients') }}";
+                        }
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        window.location.href = "{{ url_for('factures') }}";
+                        break;
+                    case 'h':
+                        e.preventDefault();
+                        window.location.href = "{{ url_for('index') }}";
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        window.location.href = "{{ url_for('dashboard') }}";
+                        break;
+                }
+            }
+        });
+
+        // Auto-refresh des statistiques toutes les 5 minutes
+        setTimeout(function() {
+            if (document.hidden === false) {
+                fetch(window.location.href, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).then(response => {
+                    if (response.ok) {
+                        // On pourrait mettre à jour certaines parties dynamiquement
+                        console.log('Page prête pour rafraîchissement');
+                    }
+                });
+            }
+        }, 300000); // 5 minutes
+
+        // Ajouter des tooltips aux raisons d'amendes
+        document.querySelectorAll('.raison-text').forEach(el => {
+            el.addEventListener('mouseenter', function() {
+                const title = this.getAttribute('title');
+                if (title && title.length > 30) {
+                    // Créer un tooltip custom
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'custom-tooltip';
+                    tooltip.textContent = title;
+                    tooltip.style.cssText = `
+                        position: absolute;
+                        background: #2C3E50;
+                        color: white;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        z-index: 1000;
+                        max-width: 300px;
+                        word-wrap: break-word;
+                    `;
+                    document.body.appendChild(tooltip);
+                    
+                    const rect = this.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + window.scrollX) + 'px';
+                    tooltip.style.top = (rect.top + window.scrollY - tooltip.offsetHeight - 5) + 'px';
+                    
+                    this.tooltip = tooltip;
+                }
+            });
+            
+            el.addEventListener('mouseleave', function() {
+                if (this.tooltip) {
+                    document.body.removeChild(this.tooltip);
+                    this.tooltip = null;
+                }
+            });
+        });
+
+        // Animation des cartes au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.stat-card, .action-card, .instruction-step');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // Afficher l'heure actuelle dans le footer
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('fr-FR', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = timeString;
+            }
+        }
+        
+        // Mettre à jour l'heure toutes les secondes
+        setInterval(updateTime, 1000);
+        updateTime(); // Appeler immédiatement
+    </script>
 </body>
 </html>
