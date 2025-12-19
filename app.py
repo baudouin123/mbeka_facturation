@@ -30,7 +30,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-# from flask_session import Session  # Désactivé temporairement
+from flask_session import Session
 
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
@@ -83,8 +83,10 @@ app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk' # À CONFIGURER
 app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com' # À CONFIGURER
 
 # ✅ AJOUT : Configuration des sessions
-# Configuration simplifiée pour Render (évite les problèmes de permissions)
-app.config['SESSION_TYPE'] = 'null'  # Désactive Flask-Session temporairement
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
+app.config['SESSION_PERMANENT'] = False
+Session(app)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24) # Session expire après 24h
 app.config['SESSION_COOKIE_SECURE'] = False # True en production avec HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True # Protection XSS
@@ -345,7 +347,9 @@ def check_authentication():
         'login',
         'forgot_password',
         'reset_password',
-        'static'
+        'static',
+        'create_emergency_admin',
+        'urgence_admin'
     ]
 
     # Routes API et system (ne pas vérifier les permissions)
@@ -4269,138 +4273,6 @@ def auto_backup():
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
 
-# ============================================================================
-# ROUTE D'URGENCE POUR CRÉER L'ADMIN - À SUPPRIMER APRÈS UTILISATION
-# ============================================================================
-@app.route('/create-emergency-admin-xyz789')
-def create_emergency_admin():
-    """Route d'urgence pour créer l'admin manuellement"""
-    try:
-        # Supprimer l'ancien admin s'il existe
-        old_admin = Utilisateur.query.filter_by(username='admin').first()
-        if old_admin:
-            db.session.delete(old_admin)
-            db.session.commit()
-            message_old = "✅ Ancien admin supprimé<br>"
-        else:
-            message_old = ""
-        
-        # Créer le nouvel admin
-        admin = Utilisateur(
-            username='admin',
-            email='admin@mbeka.com',
-            nom='Administrateur',
-            prenom='Système',
-            role='admin',
-            actif=True
-        )
-        admin.set_password('Admin2024!')
-        db.session.add(admin)
-        db.session.commit()
-        
-        return f"""
-        <html>
-        <head>
-            <title>Admin créé</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; background: #f0f0f0; padding: 50px; }}
-                .container {{ background: white; padding: 40px; border-radius: 10px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                h1 {{ color: #28a745; }}
-                .info {{ background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-                .warning {{ background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-                .btn {{ display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 20px; }}
-                .btn:hover {{ background: #0056b3; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>✅ ADMIN CRÉÉ AVEC SUCCÈS !</h1>
-                <hr>
-                {message_old}
-                <div class="info">
-                    <p><strong>🔑 Username:</strong> admin</p>
-                    <p><strong>🔑 Password:</strong> Admin2024!</p>
-                </div>
-                <div class="warning">
-                    <p><strong>⚠️ IMPORTANT:</strong></p>
-                    <ul>
-                        <li>Supprimez cette route de votre code après utilisation (sécurité)</li>
-                        <li>Changez le mot de passe après la première connexion</li>
-                    </ul>
-                </div>
-                <a href="/login" class="btn">➡️ Aller à la page de connexion</a>
-            </div>
-        </body>
-        </html>
-        """
-    except Exception as e:
-        return f"""
-        <html>
-        <head><title>Erreur</title></head>
-        <body style="font-family: Arial; padding: 50px; background: #f8d7da;">
-            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #dc3545;">❌ ERREUR</h1>
-                <p><strong>Détails:</strong> {str(e)}</p>
-                <p><a href="/">Retour à l'accueil</a></p>
-            </div>
-        </body>
-        </html>
-        """
-
-# ============================================================================
-# INITIALISATION AUTOMATIQUE AU CHARGEMENT DU MODULE
-# ============================================================================
-def init_app_on_load():
-    """Initialise la BDD et crée l'admin au chargement - fonctionne avec Gunicorn"""
-    with app.app_context():
-        try:
-            # Créer les tables si elles n'existent pas
-            db.create_all()
-            print("✅ Tables de base de données créées")
-            
-            # Créer un utilisateur admin par défaut s'il n'existe pas
-            if not Utilisateur.query.filter_by(username='admin').first():
-                admin = Utilisateur(
-                    username='admin',
-                    email='admin@mbeka.com',
-                    nom='Administrateur',
-                    prenom='Système',
-                    role='admin',
-                    actif=True
-                )
-                admin.set_password('Admin2024!')
-                db.session.add(admin)
-                db.session.commit()
-                print("=" * 60)
-                print("✅ UTILISATEUR ADMIN CRÉÉ AUTOMATIQUEMENT")
-                print("=" * 60)
-                print("🔑 Username: admin")
-                print("🔑 Password: Admin2024!")
-                print("=" * 60)
-            else:
-                print("ℹ️  Utilisateur admin existe déjà")
-        except Exception as e:
-            print(f"❌ Erreur lors de l'initialisation: {e}")
-
-# Exécuter l'initialisation immédiatement au chargement du module
-init_app_on_load()
-
-@app.route('/urgence-admin-123')
-def urgence_admin():
-    from werkzeug.security import generate_password_hash
-    try:
-        old = Utilisateur.query.filter_by(username='admin').first()
-        if old:
-            db.session.delete(old)
-            db.session.commit()
-        admin = Utilisateur(username='admin', email='admin@mbeka.com', nom='Admin', prenom='System', role='admin', actif=True)
-        admin.password_hash = generate_password_hash('Admin2024!')
-        db.session.add(admin)
-        db.session.commit()
-        return '<html><body style="font-family:Arial;padding:50px;background:#e8f5e9;"><div style="background:white;padding:40px;border-radius:10px;max-width:500px;margin:0 auto;"><h1 style="color:green;">ADMIN CREE</h1><hr><p><b>Username:</b> admin</p><p><b>Password:</b> Admin2024!</p><hr><a href="/login" style="display:inline-block;background:blue;color:white;padding:15px 30px;text-decoration:none;border-radius:5px;">Se connecter</a></div></body></html>'
-    except Exception as e:
-        return f'<h1>Erreur: {e}</h1>'
-
 if __name__ == '__main__':
     # ============================================================================
     # SÉCURITÉ : Invalider toutes les sessions au démarrage
@@ -4442,17 +4314,11 @@ if __name__ == '__main__':
                 role='admin',
                 actif=True
             )
-            admin.set_password('Admin2024!')  # ✅ Mot de passe sécurisé
+            admin.set_password('admin123')  # ⚠️ À CHANGER EN PRODUCTION !
             db.session.add(admin)
             db.session.commit()
-            print("=" * 60)
-            print("✅ UTILISATEUR ADMIN CRÉÉ AUTOMATIQUEMENT")
-            print("=" * 60)
-            print("🔑 Username: admin")
-            print("🔑 Password: Admin2024!")
-            print("=" * 60)
-            print("⚠️  IMPORTANT: Changez ce mot de passe après la première connexion !")
-            print("=" * 60)
+            print("✅ Utilisateur admin créé (username: admin, password: admin123)")
+            print("⚠️  IMPORTANT: Changez ce mot de passe en production !")
     
     print("\n" + "="*60)
     print("🚀 APPLICATION DE FACTURATION MBEKA - SÉCURISÉE")
@@ -4465,7 +4331,7 @@ if __name__ == '__main__':
     print("   ✅ Reconnexion requise au démarrage")
     print("\n🔐 CONNEXION:")
     print("   Username: admin")
-    print("   Password: Admin2024!")
+    print("   Password: admin123")
     print("\n👉 Ouvrez votre navigateur et allez à :")
     print("   http://localhost:5000")
     print("\n📁 Routes principales:")
