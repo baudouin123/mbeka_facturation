@@ -4270,20 +4270,22 @@ def auto_backup():
             app.logger.info(f"✅ Sauvegarde automatique créée : {backup_filename}")
     except Exception as e:
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
-        
-# ============================================================================
-# ROUTE TEMPORAIRE POUR CRÉER L'ADMIN - À AJOUTER DANS APP.PY
-# ============================================================================
 
+# ============================================================================
+# ROUTE D'URGENCE POUR CRÉER L'ADMIN - À SUPPRIMER APRÈS UTILISATION
+# ============================================================================
 @app.route('/create-emergency-admin-xyz789')
 def create_emergency_admin():
-    """Route d'urgence pour créer l'admin - À SUPPRIMER après utilisation"""
+    """Route d'urgence pour créer l'admin manuellement"""
     try:
         # Supprimer l'ancien admin s'il existe
         old_admin = Utilisateur.query.filter_by(username='admin').first()
         if old_admin:
             db.session.delete(old_admin)
             db.session.commit()
+            message_old = "✅ Ancien admin supprimé<br>"
+        else:
+            message_old = ""
         
         # Créer le nouvel admin
         admin = Utilisateur(
@@ -4298,17 +4300,37 @@ def create_emergency_admin():
         db.session.add(admin)
         db.session.commit()
         
-        return """
+        return f"""
         <html>
-        <body style="font-family: Arial; padding: 50px; background: #f0f0f0;">
-            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: green;">✅ ADMIN CRÉÉ AVEC SUCCÈS !</h1>
+        <head>
+            <title>Admin créé</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; background: #f0f0f0; padding: 50px; }}
+                .container {{ background: white; padding: 40px; border-radius: 10px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                h1 {{ color: #28a745; }}
+                .info {{ background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                .warning {{ background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                .btn {{ display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 20px; }}
+                .btn:hover {{ background: #0056b3; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>✅ ADMIN CRÉÉ AVEC SUCCÈS !</h1>
                 <hr>
-                <p><strong>Username:</strong> admin</p>
-                <p><strong>Password:</strong> Admin2024!</p>
-                <hr>
-                <p>⚠️ <strong>IMPORTANT:</strong> Supprimez cette route de votre code après utilisation !</p>
-                <p><a href="/login" style="background: blue; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Aller à la page de connexion</a></p>
+                {message_old}
+                <div class="info">
+                    <p><strong>🔑 Username:</strong> admin</p>
+                    <p><strong>🔑 Password:</strong> Admin2024!</p>
+                </div>
+                <div class="warning">
+                    <p><strong>⚠️ IMPORTANT:</strong></p>
+                    <ul>
+                        <li>Supprimez cette route de votre code après utilisation (sécurité)</li>
+                        <li>Changez le mot de passe après la première connexion</li>
+                    </ul>
+                </div>
+                <a href="/login" class="btn">➡️ Aller à la page de connexion</a>
             </div>
         </body>
         </html>
@@ -4316,9 +4338,13 @@ def create_emergency_admin():
     except Exception as e:
         return f"""
         <html>
-        <body style="font-family: Arial; padding: 50px;">
-            <h1 style="color: red;">❌ ERREUR</h1>
-            <p>{str(e)}</p>
+        <head><title>Erreur</title></head>
+        <body style="font-family: Arial; padding: 50px; background: #f8d7da;">
+            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #dc3545;">❌ ERREUR</h1>
+                <p><strong>Détails:</strong> {str(e)}</p>
+                <p><a href="/">Retour à l'accueil</a></p>
+            </div>
         </body>
         </html>
         """
