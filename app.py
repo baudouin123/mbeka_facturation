@@ -4312,11 +4312,17 @@ if __name__ == '__main__':
                 role='admin',
                 actif=True
             )
-            admin.set_password('admin123')  # ⚠️ À CHANGER EN PRODUCTION !
+            admin.set_password('Admin2024!')  # ✅ Mot de passe sécurisé
             db.session.add(admin)
             db.session.commit()
-            print("✅ Utilisateur admin créé (username: admin, password: admin123)")
-            print("⚠️  IMPORTANT: Changez ce mot de passe en production !")
+            print("=" * 60)
+            print("✅ UTILISATEUR ADMIN CRÉÉ AUTOMATIQUEMENT")
+            print("=" * 60)
+            print("🔑 Username: admin")
+            print("🔑 Password: Admin2024!")
+            print("=" * 60)
+            print("⚠️  IMPORTANT: Changez ce mot de passe après la première connexion !")
+            print("=" * 60)
     
     print("\n" + "="*60)
     print("🚀 APPLICATION DE FACTURATION MBEKA - SÉCURISÉE")
@@ -4329,7 +4335,7 @@ if __name__ == '__main__':
     print("   ✅ Reconnexion requise au démarrage")
     print("\n🔐 CONNEXION:")
     print("   Username: admin")
-    print("   Password: admin123")
+    print("   Password: Admin2024!")
     print("\n👉 Ouvrez votre navigateur et allez à :")
     print("   http://localhost:5000")
     print("\n📁 Routes principales:")
