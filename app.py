@@ -30,7 +30,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from flask_session import Session
+# from flask_session import Session  # Désactivé temporairement
 
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
@@ -83,10 +83,8 @@ app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk' # À CONFIGURER
 app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com' # À CONFIGURER
 
 # ✅ AJOUT : Configuration des sessions
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
-app.config['SESSION_PERMANENT'] = False
-Session(app)
+# Configuration simplifiée pour Render (évite les problèmes de permissions)
+app.config['SESSION_TYPE'] = 'null'  # Désactive Flask-Session temporairement
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24) # Session expire après 24h
 app.config['SESSION_COOKIE_SECURE'] = False # True en production avec HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True # Protection XSS
