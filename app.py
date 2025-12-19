@@ -4347,6 +4347,44 @@ def create_emergency_admin():
         </html>
         """
 
+# ============================================================================
+# INITIALISATION AUTOMATIQUE AU CHARGEMENT DU MODULE
+# ============================================================================
+def init_app_on_load():
+    """Initialise la BDD et crée l'admin au chargement - fonctionne avec Gunicorn"""
+    with app.app_context():
+        try:
+            # Créer les tables si elles n'existent pas
+            db.create_all()
+            print("✅ Tables de base de données créées")
+            
+            # Créer un utilisateur admin par défaut s'il n'existe pas
+            if not Utilisateur.query.filter_by(username='admin').first():
+                admin = Utilisateur(
+                    username='admin',
+                    email='admin@mbeka.com',
+                    nom='Administrateur',
+                    prenom='Système',
+                    role='admin',
+                    actif=True
+                )
+                admin.set_password('Admin2024!')
+                db.session.add(admin)
+                db.session.commit()
+                print("=" * 60)
+                print("✅ UTILISATEUR ADMIN CRÉÉ AUTOMATIQUEMENT")
+                print("=" * 60)
+                print("🔑 Username: admin")
+                print("🔑 Password: Admin2024!")
+                print("=" * 60)
+            else:
+                print("ℹ️  Utilisateur admin existe déjà")
+        except Exception as e:
+            print(f"❌ Erreur lors de l'initialisation: {e}")
+
+# Exécuter l'initialisation immédiatement au chargement du module
+init_app_on_load()
+
 if __name__ == '__main__':
     # ============================================================================
     # SÉCURITÉ : Invalider toutes les sessions au démarrage
