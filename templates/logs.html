@@ -4,158 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Logs d'Activité - {{ entreprise['nom'] }}</title>
-  <style>
-    /* Styles supplémentaires pour les nouvelles fonctionnalités */
-    .badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .badge-success {
-      background-color: #d1fae5;
-      color: #065f46;
-    }
-    
-    .badge-danger {
-      background-color: #fee2e2;
-      color: #991b1b;
-    }
-    
-    .badge-warning {
-      background-color: #fef3c7;
-      color: #92400e;
-    }
-    
-    .badge-info {
-      background-color: #dbeafe;
-      color: #1e40af;
-    }
-    
-    .btn-export {
-      background-color: #10b981;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: 500;
-      transition: background-color 0.2s;
-    }
-    
-    .btn-export:hover {
-      background-color: #059669;
-    }
-    
-    .color-danger {
-      color: #dc2626;
-      font-weight: bold;
-    }
-    
-    .pagination {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 20px;
-      padding: 15px;
-      background-color: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
-    }
-    
-    .pagination-controls {
-      display: flex;
-      gap: 10px;
-    }
-    
-    .details-container {
-      position: relative;
-    }
-    
-    .details-preview {
-      display: inline-block;
-      max-width: 300px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    
-    .btn-details {
-      background: none;
-      border: none;
-      color: #3b82f6;
-      cursor: pointer;
-      font-size: 12px;
-      margin-left: 5px;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-    
-    .btn-details:hover {
-      background-color: #eff6ff;
-    }
-    
-    .details-full {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      padding: 10px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      z-index: 10;
-      max-width: 400px;
-      word-wrap: break-word;
-    }
-    
-    .hidden {
-      display: none;
-    }
-    
-    .sort-link {
-      color: inherit;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
-    .sort-link:hover {
-      color: #3b82f6;
-    }
-    
-    .sort-icon {
-      font-size: 12px;
-    }
-    
-    @media (max-width: 768px) {
-      .filters-container {
-        grid-template-columns: 1fr !important;
-      }
-      
-      .table-container {
-        overflow-x: auto;
-      }
-      
-      .summary-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-      }
-      
-      .pagination {
-        flex-direction: column;
-        gap: 10px;
-        text-align: center;
-      }
-      
-      .details-preview {
-        max-width: 150px;
-      }
-    }
-  </style>
 </head>
 <body>
 <div class="container">
@@ -205,7 +53,6 @@
         {% endfor %}
       </select>
     </div>
-    
     <div class="filter-group">
       <label>Action</label>
       <select name="action" class="filter-select" form="filters-form">
@@ -215,43 +62,19 @@
         {% endfor %}
       </select>
     </div>
-    
-    <div class="filter-group">
-      <label>Période rapide</label>
-      <select name="periode_rapide" class="filter-select" onchange="appliquerPeriodeRapide(this)" form="filters-form">
-        <option value="">Personnalisée</option>
-        <option value="aujourdhui" {% if periode_rapide == 'aujourdhui' %}selected{% endif %}>Aujourd'hui</option>
-        <option value="hier" {% if periode_rapide == 'hier' %}selected{% endif %}>Hier</option>
-        <option value="7jours" {% if periode_rapide == '7jours' %}selected{% endif %}>7 derniers jours</option>
-        <option value="30jours" {% if periode_rapide == '30jours' %}selected{% endif %}>30 derniers jours</option>
-        <option value="mois_courant" {% if periode_rapide == 'mois_courant' %}selected{% endif %}>Mois courant</option>
-      </select>
-    </div>
-    
     <div class="filter-group">
       <label>Date début</label>
       <input type="date" name="date_debut" value="{{ date_debut or '' }}" class="filter-input" form="filters-form">
     </div>
-    
     <div class="filter-group">
       <label>Date fin</label>
       <input type="date" name="date_fin" value="{{ date_fin or '' }}" class="filter-input" form="filters-form">
     </div>
-    
-    <div class="filter-group">
-      <label>Recherche texte</label>
-      <input type="text" name="search" value="{{ search or '' }}" 
-             placeholder="Rechercher dans les détails..." 
-             class="filter-input" form="filters-form">
-    </div>
-    
     <div class="filter-group">
       <label>&nbsp;</label>
       <div class="form-actions-inline">
         <button type="submit" form="filters-form" class="btn-primary">Filtrer</button>
         <a href="{{ url_for('logs') }}" class="btn-secondary">Réinitialiser</a>
-        <a href="{{ url_for('export_logs', user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search) }}" 
-           class="btn-export">Exporter (CSV)</a>
       </div>
     </div>
   </section>
@@ -259,12 +82,9 @@
 
   <!-- Summary -->
   <section class="summary-grid">
-    <div class="summary-item"><span class="summary-label">Total logs</span><span class="summary-value">{{ total_logs }}</span></div>
-    <div class="summary-item"><span class="summary-label">Affichés</span><span class="summary-value">{{ logs|length }}</span></div>
+    <div class="summary-item"><span class="summary-label">Logs affichés</span><span class="summary-value">{{ logs|length }}</span></div>
     <div class="summary-item"><span class="summary-label">Connexions</span><span class="summary-value color-client">{{ logs|selectattr('action', 'equalto', 'connexion')|list|length }}</span></div>
-    <div class="summary-item"><span class="summary-label">Échecs</span><span class="summary-value color-amende">{{ logs|selectattr('action', 'equalto', 'tentative_connexion_echouee')|list|length }}</span></div>
-    <div class="summary-item"><span class="summary-label">Modifications</span><span class="summary-value">{{ logs|selectattr('action', 'match', '.*modification.*')|list|length }}</span></div>
-    <div class="summary-item"><span class="summary-label">Suppressions</span><span class="summary-value color-danger">{{ logs|selectattr('action', 'match', '.*suppression.*')|list|length }}</span></div>
+    <div class="summary-item"><span class="summary-label">Tentatives échouées</span><span class="summary-value color-amende">{{ logs|selectattr('action', 'equalto', 'tentative_connexion_echouee')|list|length }}</span></div>
   </section>
 
   <!-- Table -->
@@ -273,47 +93,11 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>
-              <a href="{{ url_for('logs', sort='date', order='desc' if sort_by == 'date' and order == 'asc' else 'asc', 
-                        user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, periode_rapide=periode_rapide) }}" 
-                 class="sort-link">
-                Date &amp; Heure 
-                {% if sort_by == 'date' %}
-                  <span class="sort-icon">{{ '▼' if order == 'desc' else '▲' }}</span>
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('logs', sort='utilisateur', order='desc' if sort_by == 'utilisateur' and order == 'asc' else 'asc', 
-                        user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, periode_rapide=periode_rapide) }}" 
-                 class="sort-link">
-                Utilisateur 
-                {% if sort_by == 'utilisateur' %}
-                  <span class="sort-icon">{{ '▼' if order == 'desc' else '▲' }}</span>
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('logs', sort='action', order='desc' if sort_by == 'action' and order == 'asc' else 'asc', 
-                        user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, periode_rapide=periode_rapide) }}" 
-                 class="sort-link">
-                Action 
-                {% if sort_by == 'action' %}
-                  <span class="sort-icon">{{ '▼' if order == 'desc' else '▲' }}</span>
-                {% endif %}
-              </a>
-            </th>
+            <th>Date &amp; Heure</th>
+            <th>Utilisateur</th>
+            <th>Action</th>
             <th>Détails</th>
-            <th>
-              <a href="{{ url_for('logs', sort='ip', order='desc' if sort_by == 'ip' and order == 'asc' else 'asc', 
-                        user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, periode_rapide=periode_rapide) }}" 
-                 class="sort-link">
-                IP 
-                {% if sort_by == 'ip' %}
-                  <span class="sort-icon">{{ '▼' if order == 'desc' else '▲' }}</span>
-                {% endif %}
-              </a>
-            </th>
+            <th>IP</th>
           </tr>
         </thead>
         <tbody>
@@ -323,31 +107,20 @@
               <td>{{ log.date.strftime('%d/%m/%Y %H:%M:%S') if log.date else '-' }}</td>
               <td>{{ log.utilisateur_nom or 'Système' }}</td>
               <td>
-                {% if log.action == 'connexion' %}
-                  <span class="badge badge-success">Connexion</span>
-                {% elif log.action == 'deconnexion' %}
-                  <span class="badge badge-info">Déconnexion</span>
-                {% elif log.action == 'tentative_connexion_echouee' %}
-                  <span class="badge badge-danger">Connexion échouée</span>
-                {% elif 'suppression' in log.action %}
-                  <span class="badge badge-warning">{{ log.action|replace('_', ' ')|title }}</span>
-                {% elif 'creation' in log.action %}
-                  <span class="badge badge-info" style="background-color: #dbeafe; color: #1e40af;">{{ log.action|replace('_', ' ')|title }}</span>
-                {% elif 'modification' in log.action %}
-                  <span class="badge badge-info" style="background-color: #e0e7ff; color: #3730a3;">{{ log.action|replace('_', ' ')|title }}</span>
-                {% else %}
-                  <span class="badge badge-info">{{ log.action|replace('_', ' ')|title }}</span>
-                {% endif %}
+                {% if log.action == 'connexion' %}Connexion
+                {% elif log.action == 'deconnexion' %}Déconnexion
+                {% elif log.action == 'tentative_connexion_echouee' %}Connexion échouée
+                {% elif log.action == 'creation_facture' %}Création facture
+                {% elif log.action == 'modification_facture' %}Modification facture
+                {% elif log.action == 'suppression_facture' %}Suppression facture
+                {% elif log.action == 'creation_utilisateur' %}Création utilisateur
+                {% elif log.action == 'modification_utilisateur' %}Modification utilisateur
+                {% elif log.action == 'suppression_utilisateur' %}Suppression utilisateur
+                {% elif log.action == 'changement_mot_de_passe' %}Changement mot de passe
+                {% elif log.action == 'envoi_email_reset' %}Envoi email reset
+                {% else %}{{ log.action }}{% endif %}
               </td>
-              <td>
-                <div class="details-container">
-                  <span class="details-preview">{{ (log.details or '-')|truncate(50) }}</span>
-                  {% if log.details and log.details|length > 50 %}
-                    <button class="btn-details" onclick="toggleDetails('{{ loop.index }}')">Voir plus</button>
-                    <div id="details-{{ loop.index }}" class="details-full hidden">{{ log.details }}</div>
-                  {% endif %}
-                </div>
-              </td>
+              <td>{{ log.details or '-' }}</td>
               <td>{{ log.ip_address or '-' }}</td>
             </tr>
           {% endfor %}
@@ -361,35 +134,6 @@
     </div>
   </section>
 
-  <!-- Pagination -->
-  {% if logs and logs|length > 0 %}
-    <div class="pagination">
-      <span>Page {{ page }} sur {{ total_pages }} ({{ total_logs }} logs au total)</span>
-      <div class="pagination-controls">
-        {% if page > 1 %}
-          <a href="{{ url_for('logs', page=page-1, user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, sort=sort_by, order=order, periode_rapide=periode_rapide) }}" 
-             class="btn-secondary">Précédent</a>
-        {% endif %}
-        
-        {% for p in range(1, total_pages + 1) %}
-          {% if p >= page - 2 and p <= page + 2 %}
-            {% if p == page %}
-              <span class="btn-primary" style="opacity: 0.7;">{{ p }}</span>
-            {% else %}
-              <a href="{{ url_for('logs', page=p, user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, sort=sort_by, order=order, periode_rapide=periode_rapide) }}" 
-                 class="btn-secondary">{{ p }}</a>
-            {% endif %}
-          {% endif %}
-        {% endfor %}
-        
-        {% if page < total_pages %}
-          <a href="{{ url_for('logs', page=page+1, user=user_filter, action=action_filter, date_debut=date_debut, date_fin=date_fin, search=search, sort=sort_by, order=order, periode_rapide=periode_rapide) }}" 
-             class="btn-secondary">Suivant</a>
-        {% endif %}
-      </div>
-    </div>
-  {% endif %}
-
   {% if logs|length >= 1000 %}
     <div class="info-card mt-3">Affichage limité aux 1000 derniers logs. Utilisez les filtres pour affiner votre recherche.</div>
   {% endif %}
@@ -399,77 +143,7 @@
   </footer>
 </div>
 
-<!-- CSS principal -->
+<!-- CSS en fin de page, comme tes autres templates -->
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-<script>
-function toggleDetails(id) {
-  const detailsElement = document.getElementById('details-' + id);
-  if (detailsElement.classList.contains('hidden')) {
-    detailsElement.classList.remove('hidden');
-    event.target.textContent = 'Voir moins';
-  } else {
-    detailsElement.classList.add('hidden');
-    event.target.textContent = 'Voir plus';
-  }
-}
-
-function appliquerPeriodeRapide(select) {
-  const today = new Date();
-  const form = document.getElementById('filters-form');
-  
-  // Réinitialiser d'abord les dates
-  form.date_debut.value = '';
-  form.date_fin.value = '';
-  
-  switch(select.value) {
-    case 'aujourdhui':
-      form.date_debut.value = today.toISOString().split('T')[0];
-      form.date_fin.value = today.toISOString().split('T')[0];
-      break;
-    case 'hier':
-      const hier = new Date(today);
-      hier.setDate(hier.getDate() - 1);
-      form.date_debut.value = hier.toISOString().split('T')[0];
-      form.date_fin.value = hier.toISOString().split('T')[0];
-      break;
-    case '7jours':
-      const semainePassee = new Date(today);
-      semainePassee.setDate(semainePassee.getDate() - 7);
-      form.date_debut.value = semainePassee.toISOString().split('T')[0];
-      form.date_fin.value = today.toISOString().split('T')[0];
-      break;
-    case '30jours':
-      const moisPasse = new Date(today);
-      moisPasse.setDate(moisPasse.getDate() - 30);
-      form.date_debut.value = moisPasse.toISOString().split('T')[0];
-      form.date_fin.value = today.toISOString().split('T')[0];
-      break;
-    case 'mois_courant':
-      const premierJourMois = new Date(today.getFullYear(), today.getMonth(), 1);
-      const dernierJourMois = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      form.date_debut.value = premierJourMois.toISOString().split('T')[0];
-      form.date_fin.value = dernierJourMois.toISOString().split('T')[0];
-      break;
-  }
-  
-  // Soumettre automatiquement le formulaire
-  form.submit();
-}
-
-// Fermer les détails quand on clique ailleurs
-document.addEventListener('click', function(event) {
-  const detailsElements = document.querySelectorAll('.details-full:not(.hidden)');
-  detailsElements.forEach(element => {
-    if (!element.contains(event.target) && !event.target.classList.contains('btn-details')) {
-      element.classList.add('hidden');
-      const button = element.previousElementSibling.previousElementSibling;
-      if (button && button.classList.contains('btn-details')) {
-        button.textContent = 'Voir plus';
-      }
-    }
-  });
-});
-</script>
 </body>
 </html>
