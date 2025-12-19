@@ -4387,67 +4387,19 @@ init_app_on_load()
 
 @app.route('/urgence-admin-123')
 def urgence_admin():
-    """Route ultra-simple pour créer l'admin"""
     from werkzeug.security import generate_password_hash
-    
     try:
-        # Supprimer ancien admin
         old = Utilisateur.query.filter_by(username='admin').first()
         if old:
             db.session.delete(old)
             db.session.commit()
-        
-        # Créer nouvel admin
-        admin = Utilisateur(
-            username='admin',
-            email='admin@mbeka.com',
-            nom='Admin',
-            prenom='System',
-            role='admin',
-            actif=True
-        )
+        admin = Utilisateur(username='admin', email='admin@mbeka.com', nom='Admin', prenom='System', role='admin', actif=True)
         admin.password_hash = generate_password_hash('Admin2024!')
-        
         db.session.add(admin)
         db.session.commit()
-        
-        return """
-        <html>
-        <body style="font-family:Arial; padding:50px; background:#e8f5e9;">
-            <div style="background:white; padding:40px; border-radius:10px; max-width:500px; margin:0 auto;">
-                <h1 style="color:green;">✅ ADMIN CRÉÉ !</h1>
-                <hr>
-                <p><b>Username:</b> admin</p>
-                <p><b>Password:</b> Admin2024!</p>
-                <hr>
-                <a href="/login" style="display:inline-block; background:blue; color:white; padding:15px 30px; text-decoration:none; border-radius:5px;">Se connecter</a>
-            </div>
-        </body>
-        </html>
-        """
+        return '<html><body style="font-family:Arial;padding:50px;background:#e8f5e9;"><div style="background:white;padding:40px;border-radius:10px;max-width:500px;margin:0 auto;"><h1 style="color:green;">ADMIN CREE</h1><hr><p><b>Username:</b> admin</p><p><b>Password:</b> Admin2024!</p><hr><a href="/login" style="display:inline-block;background:blue;color:white;padding:15px 30px;text-decoration:none;border-radius:5px;">Se connecter</a></div></body></html>'
     except Exception as e:
-        return f"<h1>Erreur: {e}</h1><p>Contactez le support</p>"
-
-if __name__ == '__main__':
-```
-
-### **ÉTAPE 4 : Commit**
-- Commit → "Add emergency admin route"
-
-### **ÉTAPE 5 : Attendez 3 minutes**
-Render redéploie automatiquement
-
-### **ÉTAPE 6 : Allez sur cette URL**
-```
-https://mbeka-facturation.onrender.com/urgence-admin-123
-```
-
-### **ÉTAPE 7 : Cliquez sur "Se connecter"**
-
-### **ÉTAPE 8 : Connectez-vous**
-```
-Username: admin
-Password: Admin2024!
+        return f'<h1>Erreur: {e}</h1>'
 
 if __name__ == '__main__':
     # ============================================================================
