@@ -4285,19 +4285,6 @@ def auto_backup():
         app.logger.error(f"❌ Erreur sauvegarde automatique : {e}")
 
 
-try:
-    from extensions_roles import init_roles
-    from extensions_devis import init_devis
-# ============================================================================
-# MODULE RÔLES PERSONNALISABLES - AJOUTÉ AUTOMATIQUEMENT
-# ============================================================================
-
-# ============================================================================
-# MODULE DE GESTION DES RÔLES PERSONNALISABLES
-# ============================================================================
-# À AJOUTER dans app.py AVANT la ligne "if __name__ == '__main__':" (ligne 4340)
-# ============================================================================
-
 # ========================================================================
 # NOUVEAUX MODÈLES POUR LES RÔLES
 # ========================================================================
