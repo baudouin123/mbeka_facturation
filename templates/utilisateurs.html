@@ -1395,10 +1395,15 @@
         
         async function modifierUtilisateur(userId) {
             try {
+                console.log('🔍 DEBUG: Chargement utilisateur ID:', userId);
+                
                 const response = await fetch('/api/utilisateurs/' + userId);
+                console.log('🔍 DEBUG: Response status:', response.status);
+                
                 if (!response.ok) throw new Error('Utilisateur introuvable');
                 
                 const user = await response.json();
+                console.log('✅ DEBUG: Données reçues:', user);
                 
                 // Remplir le formulaire
                 document.getElementById('edit-user-id').value = user.id;
@@ -1411,6 +1416,8 @@
                 document.getElementById('edit-actif').checked = user.actif;
                 document.getElementById('edit-password').value = '';
                 
+                console.log('✅ DEBUG: Formulaire rempli');
+                
                 // Gérer les événements
                 document.getElementById('edit-password').oninput = (e) => 
                     verifierForceMotDePasse(e.target.value, 'password-strength-edit');
@@ -1420,9 +1427,10 @@
                 
                 // Afficher le modal
                 document.getElementById('modalModifier').style.display = 'block';
+                console.log('✅ DEBUG: Modal affiché');
             } catch (error) {
-                console.error('Erreur:', error);
-                alert('❌ Erreur de chargement');
+                console.error('❌ DEBUG: Erreur:', error);
+                alert('❌ Erreur de chargement: ' + error.message);
             }
         }
         
