@@ -2887,8 +2887,6 @@ def factures_en_retard():
 # INITIALISATION
 # ============================================================================
  
-with app.app_context():
-    db.create_all()
     
     # Créer les dossiers nécessaires
     os.makedirs('factures', exist_ok=True)
@@ -4731,20 +4729,6 @@ def api_dupliquer_role(role_id):
 # INITIALISER LES RÔLES AU DÉMARRAGE
 # ========================================================================
 
-def init_app_on_load():
-    """Fonction appelée au démarrage de l'application"""
-    with app.app_context():
-        try:
-            db.create_all()
-            initialiser_roles_systeme()
-            print("✅ Base de données et rôles initialisés")
-        except Exception as e:
-            print(f"⚠️ Erreur initialisation: {e}")
-
-# Appeler init au chargement
-init_app_on_load()
-
-# ============================================================================
 # FIN DU MODULE RÔLES
 # ============================================================================
 
@@ -4756,19 +4740,15 @@ if __name__ == '__main__':
     # ============================================================================
     # SÉCURITÉ : Invalider toutes les sessions au démarrage
     # ============================================================================
-    # Changer la clé secrète au démarrage invalide TOUS les cookies/sessions existants
-    # Ceci force une reconnexion obligatoire de tous les utilisateurs
     import secrets
     import hashlib
     
-    # Générer une nouvelle SECRET_KEY basée sur le timestamp
     timestamp = datetime.now().isoformat()
     new_secret = hashlib.sha256(f"mbeka-{timestamp}-{secrets.token_hex(16)}".encode()).hexdigest()
     app.config['SECRET_KEY'] = new_secret
     
     print("🔒 Nouvelle clé de session générée - toutes les sessions précédentes invalidées")
     
-    # Nettoyer aussi le dossier flask_session s'il existe
     try:
         flask_session_dir = os.path.join(os.path.dirname(__file__), 'flask_session')
         if os.path.exists(flask_session_dir):
@@ -4783,6 +4763,12 @@ if __name__ == '__main__':
         # Créer les tables si elles n'existent pas
         db.create_all()
         
+        # Initialiser les rôles système
+        try:
+            initialiser_roles_systeme()
+        except Exception as e:
+            print(f"⚠️ Erreur initialisation rôles: {e}")
+        
         # Créer un utilisateur admin par défaut s'il n'existe pas
         if not Utilisateur.query.filter_by(username='admin').first():
             admin = Utilisateur(
@@ -4793,7 +4779,7 @@ if __name__ == '__main__':
                 role='admin',
                 actif=True
             )
-            admin.set_password('admin123')  # ⚠️ À CHANGER EN PRODUCTION !
+            admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
             print("✅ Utilisateur admin créé (username: admin, password: admin123)")
@@ -4818,8 +4804,7 @@ if __name__ == '__main__':
     print("   /                        - Tableau de bord")
     print("   /utilisateurs            - Gestion utilisateurs (admin)")
     print("   /factures                - Toutes les factures")
+    print("   /roles                   - Gestion des rôles (admin)")
     print("="*60)
     
-    
-    # Ceci est la dernière ligne, elle DOIT être atteinte pour lancer le serveur
     app.run(debug=True, host='0.0.0.0', port=5000)
