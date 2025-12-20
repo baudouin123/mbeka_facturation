@@ -14,6 +14,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from datetime import datetime, date, timedelta
+from extensions_roles import init_roles
+from extensions_devis import init_devis
 import os
 import json
 import shutil
