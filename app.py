@@ -4761,7 +4761,12 @@ if __name__ == '__main__':
     
     with app.app_context():
         # Créer les tables si elles n'existent pas
-        db.create_all()
+        try:
+            db.create_all()
+            print("✅ Tables créées")
+        except Exception as e:
+            # Les tables existent déjà, c'est normal
+            print(f"ℹ️  Tables déjà existantes : {str(e)[:100]}")
         
         # Initialiser les rôles système
         try:
