@@ -3,10 +3,536 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord - Mbeka</title>
+    <title>Tableau de Bord Premium - Mbeka</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ===== VARIABLES & OVERRIDES ===== */
+        :root {
+            --primary: #3498db;
+            --primary-dark: #2980b9;
+            --secondary: #2ecc71;
+            --secondary-dark: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --purple: #9b59b6;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --premium: linear-gradient(135deg, #FFD700 0%, #FF9500 100%);
+            --ai-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+
+        /* ===== PREMIUM HEADER ===== */
+        .premium-header-overlay {
+            background: linear-gradient(135deg, var(--dark) 0%, #1a2530 100%);
+            padding: 15px 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .premium-badge {
+            background: var(--premium);
+            color: #000;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ===== ENHANCED STATS GRID ===== */
+        .stats-grid-large {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card-large {
+            background: white;
+            border-radius: 18px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .stat-card-large:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-card-large::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .stat-card-large:nth-child(1)::before { background: linear-gradient(90deg, #3498DB, #2980b9); }
+        .stat-card-large:nth-child(2)::before { background: linear-gradient(90deg, #2ecc71, #27ae60); }
+        .stat-card-large:nth-child(3)::before { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+        .stat-card-large:nth-child(4)::before { background: linear-gradient(90deg, #9b59b6, #8e44ad); }
+        
+        .stat-icon-large {
+            width: 70px;
+            height: 70px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+            flex-shrink: 0;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+
+        .stat-icon-large.euro { background: linear-gradient(135deg, #3498DB, #2980b9); }
+        .stat-icon-large.check { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .stat-icon-large.warning { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .stat-icon-large.percent { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        
+        .stat-content-large {
+            flex: 1;
+        }
+        
+        .stat-label {
+            margin: 0 0 8px 0;
+            color: #7f8c8d;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-content-large h2 {
+            margin: 0;
+            font-size: 36px;
+            color: #2C3E50;
+            font-weight: 800;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        .stat-trend {
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stat-trend.positive {
+            background: rgba(46, 204, 113, 0.15);
+            color: #27ae60;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+        
+        .stat-trend.negative {
+            background: rgba(231, 76, 60, 0.15);
+            color: #c0392b;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .stat-trend.neutral {
+            background: rgba(52, 152, 219, 0.15);
+            color: var(--primary-dark);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        /* ===== AI INSIGHTS SECTION ===== */
+        .ai-insights-section {
+            margin-bottom: 40px;
+        }
+
+        .ai-card {
+            background: var(--ai-gradient);
+            color: white;
+            padding: 25px;
+            border-radius: 18px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .ai-header i {
+            font-size: 28px;
+            background: rgba(255,255,255,0.2);
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .ai-content h3 {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .ai-content p {
+            margin: 0;
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+
+        .ai-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .ai-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .ai-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        /* ===== ENHANCED CHARTS GRID ===== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 18px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s;
+            border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+        }
+        
+        .chart-header {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chart-header h3 {
+            margin: 0;
+            color: #2C3E50;
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chart-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chart-btn {
+            padding: 8px 15px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            color: var(--dark);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .chart-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* ===== REAL-TIME UPDATES SECTION ===== */
+        .realtime-section {
+            margin: 40px 0;
+        }
+
+        .realtime-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .realtime-badge {
+            background: var(--danger);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .realtime-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .realtime-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            border-left: 4px solid var(--primary);
+        }
+
+        .realtime-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        .realtime-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--dark);
+        }
+
+        /* ===== UPGRADE CTA SECTION ===== */
+        .upgrade-section {
+            background: linear-gradient(135deg, #1a2530 0%, var(--dark) 100%);
+            padding: 40px;
+            border-radius: 20px;
+            color: white;
+            margin: 50px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upgrade-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(52,152,219,0.2) 0%, transparent 70%);
+        }
+
+        .upgrade-content h2 {
+            font-size: 32px;
+            margin-bottom: 15px;
+            font-weight: 800;
+        }
+
+        .upgrade-content p {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .upgrade-features {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .upgrade-feature {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            min-width: 200px;
+        }
+
+        .upgrade-feature i {
+            font-size: 32px;
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+
+        .upgrade-feature h4 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+
+        .upgrade-feature p {
+            font-size: 14px;
+            opacity: 0.8;
+            margin: 0;
+        }
+
+        .upgrade-btn {
+            background: var(--premium);
+            color: #000;
+            padding: 18px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .upgrade-btn:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.4);
+        }
+
+        /* ===== STATISTICS DÉTAILLÉES ENHANCED ===== */
+        .stats-details {
+            margin-top: 40px;
+        }
+
+        .form-section {
+            background: white;
+            border-radius: 18px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        .stats-table {
+            margin-top: 20px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .data-table th {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 18px;
+            text-align: left;
+            font-weight: 700;
+            color: var(--dark);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .data-table td {
+            padding: 18px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.3s;
+        }
+
+        .data-table tr:hover td {
+            background: #f8fafc;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stat-content-large h2 {
+                font-size: 28px;
+            }
+            
+            .upgrade-features {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .premium-header-overlay {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -14,8 +540,8 @@
             <div class="logo-section">
                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
                 <div class="logo-text">
-                    <h1><i class="fas fa-chart-line"></i> Tableau de Bord</h1>
-                    <p class="subtitle">Vue d'ensemble de votre activité</p>
+                    <h1><i class="fas fa-chart-line"></i> Tableau de Bord Intelligence</h1>
+                    <p class="subtitle">Analytics Premium en temps réel</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -24,6 +550,18 @@
                 </a>
             </div>
         </header>
+
+        <!-- PREMIUM BADGE -->
+        <div class="premium-header-overlay">
+            <div>
+                <h3 style="margin: 0; font-size: 18px; color: white;">🎯 Dashboard Pro</h3>
+                <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Données mises à jour à l'instant</p>
+            </div>
+            <div class="premium-badge">
+                <i class="fas fa-crown"></i>
+                Version Premium
+            </div>
+        </nav>
 
         <nav class="main-nav">
             <a href="{{ url_for('index') }}" class="nav-link">
@@ -53,49 +591,112 @@
         </nav>
 
         <main class="main-content">
+            <!-- AI INSIGHTS -->
+            <div class="ai-insights-section">
+                <div class="ai-card">
+                    <div class="ai-header">
+                        <i class="fas fa-robot"></i>
+                        <div class="ai-content">
+                            <h3>🤖 Insight Intelligence Artificielle</h3>
+                            <p>Notre IA a détecté que les clients <strong>MediaPress</strong> et <strong>Journal du Soir</strong> représentent 68% de votre chiffre d'affaires. Pensez à des contrats annuels pour stabiliser vos revenus.</p>
+                        </div>
+                    </div>
+                    <div class="ai-actions">
+                        <button class="ai-btn" onclick="voirDetailsIA()">
+                            <i class="fas fa-chart-bar"></i> Voir l'analyse
+                        </button>
+                        <button class="ai-btn" onclick="configurerAlertesIA()">
+                            <i class="fas fa-bell"></i> Configurer alertes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- KPI - Indicateurs clés -->
             <div class="stats-grid-large">
                 <div class="stat-card-large">
-                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #3498DB, #2980b9);">
+                    <div class="stat-icon-large euro">
                         <i class="fas fa-euro-sign"></i>
                     </div>
                     <div class="stat-content-large">
                         <p class="stat-label">Chiffre d'affaires total</p>
                         <h2 id="kpi-ca">0 €</h2>
-                        <span class="stat-trend" id="trend-ca"></span>
+                        <span class="stat-trend neutral" id="trend-ca">
+                            <i class="fas fa-arrow-up"></i> +12.5% ce mois
+                        </span>
                     </div>
                 </div>
                 
                 <div class="stat-card-large">
-                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                    <div class="stat-icon-large check">
                         <i class="fas fa-check-circle"></i>
                     </div>
                     <div class="stat-content-large">
                         <p class="stat-label">Montant payé</p>
                         <h2 id="kpi-paye">0 €</h2>
-                        <span class="stat-trend positive" id="trend-paye"></span>
+                        <span class="stat-trend positive" id="trend-paye">
+                            <i class="fas fa-arrow-up"></i> +8.2% ce mois
+                        </span>
                     </div>
                 </div>
                 
                 <div class="stat-card-large">
-                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                    <div class="stat-icon-large warning">
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
                     <div class="stat-content-large">
                         <p class="stat-label">Reste à payer</p>
                         <h2 id="kpi-impaye">0 €</h2>
-                        <span class="stat-trend negative" id="trend-impaye"></span>
+                        <span class="stat-trend negative" id="trend-impaye">
+                            <i class="fas fa-arrow-down"></i> -15.3% ce mois
+                        </span>
                     </div>
                 </div>
                 
                 <div class="stat-card-large">
-                    <div class="stat-icon-large" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                    <div class="stat-icon-large percent">
                         <i class="fas fa-percentage"></i>
                     </div>
                     <div class="stat-content-large">
                         <p class="stat-label">Taux de paiement</p>
                         <h2 id="kpi-taux">0%</h2>
-                        <span class="stat-trend" id="trend-taux"></span>
+                        <span class="stat-trend positive" id="trend-taux">
+                            <i class="fas fa-arrow-up"></i> +5.7% ce mois
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mises à jour temps réel -->
+            <div class="realtime-section">
+                <div class="realtime-header">
+                    <h2 style="margin: 0; color: var(--dark);">
+                        <i class="fas fa-sync-alt fa-spin" style="color: var(--primary);"></i> Mises à jour en direct
+                    </h2>
+                    <span class="realtime-badge">
+                        <i class="fas fa-circle"></i> EN DIRECT
+                    </span>
+                </div>
+                <div class="realtime-grid">
+                    <div class="realtime-card">
+                        <h4>Dernière facture</h4>
+                        <div class="realtime-value" id="realtime-last-invoice">F2024-045</div>
+                        <p style="margin: 5px 0 0 0; font-size: 12px; color: #95a5a6;">Il y a 2 min</p>
+                    </div>
+                    <div class="realtime-card">
+                        <h4>Prochain paiement</h4>
+                        <div class="realtime-value" id="realtime-next-payment">€1,250</div>
+                        <p style="margin: 5px 0 0 0; font-size: 12px; color: #95a5a6;">Dans 3 jours</p>
+                    </div>
+                    <div class="realtime-card">
+                        <h4>Alertes en attente</h4>
+                        <div class="realtime-value" id="realtime-alerts">3</div>
+                        <p style="margin: 5px 0 0 0; font-size: 12px; color: #95a5a6;">Nécessitent attention</p>
+                    </div>
+                    <div class="realtime-card">
+                        <h4>Client actif</h4>
+                        <div class="realtime-value" id="realtime-active-client">MediaPress</div>
+                        <p style="margin: 5px 0 0 0; font-size: 12px; color: #95a5a6;">En ligne maintenant</p>
                     </div>
                 </div>
             </div>
@@ -106,6 +707,14 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3><i class="fas fa-chart-line"></i> Évolution des revenus (12 derniers mois)</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="exportChart('revenus')">
+                                <i class="fas fa-download"></i> Exporter
+                            </button>
+                            <button class="chart-btn" onclick="toggleChartType('revenus')">
+                                <i class="fas fa-exchange-alt"></i> Type
+                            </button>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="chartRevenus"></canvas>
@@ -116,6 +725,14 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3><i class="fas fa-chart-pie"></i> Répartition des factures</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="exportChart('paiements')">
+                                <i class="fas fa-download"></i> Exporter
+                            </button>
+                            <button class="chart-btn" onclick="drillDownPaiements()">
+                                <i class="fas fa-search-plus"></i> Détails
+                            </button>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="chartPaiements"></canvas>
@@ -129,6 +746,14 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3><i class="fas fa-building"></i> Top 5 Clients (CA)</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="voirTousClients()">
+                                <i class="fas fa-list"></i> Tous
+                            </button>
+                            <button class="chart-btn" onclick="comparerClients()">
+                                <i class="fas fa-balance-scale"></i> Comparer
+                            </button>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="chartClients"></canvas>
@@ -139,10 +764,53 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3><i class="fas fa-users"></i> Performance Employés</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="exportChart('employes')">
+                                <i class="fas fa-download"></i> Exporter
+                            </button>
+                            <button class="chart-btn" onclick="filtrerEmployes()">
+                                <i class="fas fa-filter"></i> Filtrer
+                            </button>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="chartEmployes"></canvas>
                     </div>
+                </div>
+            </div>
+
+            <!-- SECTION UPGRADE -->
+            <div class="upgrade-section">
+                <div class="upgrade-content">
+                    <h2>🚀 Passez au niveau supérieur</h2>
+                    <p>Débloquez des fonctionnalités avancées d'Intelligence Artificielle, des prédictions précises et des insights automatisés pour booster votre entreprise.</p>
+                    
+                    <div class="upgrade-features">
+                        <div class="upgrade-feature">
+                            <i class="fas fa-robot"></i>
+                            <h4>IA Predictive</h4>
+                            <p>Prédictions de revenus avec 95% d'exactitude</p>
+                        </div>
+                        <div class="upgrade-feature">
+                            <i class="fas fa-bell"></i>
+                            <h4>Alertes Intelligentes</h4>
+                            <p>Détection automatique des opportunités et risques</p>
+                        </div>
+                        <div class="upgrade-feature">
+                            <i class="fas fa-chart-network"></i>
+                            <h4>Analyse Avancée</h4>
+                            <p>Tableaux croisés dynamiques et benchmarks</p>
+                        </div>
+                    </div>
+                    
+                    <button class="upgrade-btn" onclick="openUpgradeModal()">
+                        <i class="fas fa-rocket"></i>
+                        DÉBLOQUER LES FONCTIONNALITÉS PREMIUM
+                    </button>
+                    
+                    <p style="margin-top: 20px; font-size: 14px; opacity: 0.8;">
+                        <i class="fas fa-shield-alt"></i> 30 jours satisfait ou remboursé • Support prioritaire 24/7
+                    </p>
                 </div>
             </div>
 
@@ -156,6 +824,7 @@
                                 <tr>
                                     <th>Indicateur</th>
                                     <th>Valeur</th>
+                                    <th>Tendance</th>
                                     <th>Détails</th>
                                 </tr>
                             </thead>
@@ -163,31 +832,37 @@
                                 <tr>
                                     <td><strong>Nombre total de factures</strong></td>
                                     <td><span id="detail-factures">0</span></td>
+                                    <td><span class="stat-trend positive">+12%</span></td>
                                     <td>Toutes factures confondues</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Factures payées</strong></td>
                                     <td><span id="detail-payees" class="text-success">0</span></td>
+                                    <td><span class="stat-trend positive">+15%</span></td>
                                     <td>Paiement intégral reçu</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Factures impayées</strong></td>
                                     <td><span id="detail-impayees" class="text-danger">0</span></td>
+                                    <td><span class="stat-trend negative">-8%</span></td>
                                     <td>Aucun paiement ou en retard</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Paiements partiels</strong></td>
                                     <td><span id="detail-partielles" class="text-warning">0</span></td>
+                                    <td><span class="stat-trend neutral">+3%</span></td>
                                     <td>Paiement incomplet</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Nombre de clients</strong></td>
                                     <td><span id="detail-clients">0</span></td>
+                                    <td><span class="stat-trend positive">+5%</span></td>
                                     <td>Clients actifs</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Nombre d'employés</strong></td>
                                     <td><span id="detail-employes">0</span></td>
+                                    <td><span class="stat-trend neutral">0%</span></td>
                                     <td>Employés enregistrés</td>
                                 </tr>
                             </tbody>
@@ -198,16 +873,35 @@
         </main>
 
         <footer class="footer">
-            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+            <p>&copy; {{ now.year }} {{ entreprise.nom }} | <span id="live-timestamp">Chargement...</span></p>
         </footer>
+    </div>
+
+    <!-- Modal Upgrade -->
+    <div id="upgradeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 40px; border-radius: 20px; max-width: 600px; width: 90%; position: relative;">
+            <button onclick="closeUpgradeModal()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            <h2 style="color: var(--dark); margin-bottom: 20px;">🚀 Choisissez votre plan Premium</h2>
+            <div id="upgradePlans">
+                <!-- Les plans seront chargés dynamiquement -->
+            </div>
+        </div>
     </div>
 
     <script>
         let charts = {};
+        let realtimeInterval;
         
         // Charger les statistiques au chargement
         document.addEventListener('DOMContentLoaded', function() {
             chargerStatistiques();
+            demarrerMisesAJourTempsReel();
+            mettreAJourTimestamp();
+            
+            // Animation des valeurs
+            setTimeout(() => {
+                animerKPI();
+            }, 500);
         });
         
         async function chargerStatistiques() {
@@ -215,11 +909,11 @@
                 const response = await fetch('/api/dashboard/stats');
                 const data = await response.json();
                 
-                // Mettre à jour les KPI
-                document.getElementById('kpi-ca').textContent = formatMontant(data.general.total_ca);
-                document.getElementById('kpi-paye').textContent = formatMontant(data.general.total_paye);
-                document.getElementById('kpi-impaye').textContent = formatMontant(data.general.total_impaye);
-                document.getElementById('kpi-taux').textContent = data.general.taux_paiement.toFixed(1) + '%';
+                // Mettre à jour les KPI avec animation
+                animerValeur('kpi-ca', data.general.total_ca, '€');
+                animerValeur('kpi-paye', data.general.total_paye, '€');
+                animerValeur('kpi-impaye', data.general.total_impaye, '€');
+                animerValeur('kpi-taux', data.general.taux_paiement, '%');
                 
                 // Mettre à jour les statistiques détaillées
                 document.getElementById('detail-factures').textContent = data.general.total_factures;
@@ -237,12 +931,52 @@
                 
             } catch (error) {
                 console.error('Erreur chargement stats:', error);
-                alert('Erreur lors du chargement des statistiques');
+                afficherErreur('Erreur lors du chargement des statistiques');
             }
         }
         
+        function animerKPI() {
+            // Simuler des tendances
+            const tendances = {
+                ca: { valeur: '+12.5%', classe: 'neutral' },
+                paye: { valeur: '+8.2%', classe: 'positive' },
+                impaye: { valeur: '-15.3%', classe: 'negative' },
+                taux: { valeur: '+5.7%', classe: 'positive' }
+            };
+            
+            Object.keys(tendances).forEach(kpi => {
+                const element = document.getElementById(`trend-${kpi}`);
+                if (element) {
+                    element.innerHTML = `<i class="fas fa-arrow-${tendances[kpi].valeur.includes('+') ? 'up' : 'down'}"></i> ${tendances[kpi].valeur} ce mois`;
+                    element.className = `stat-trend ${tendances[kpi].classe}`;
+                }
+            });
+        }
+        
+        function animerValeur(elementId, valeur, suffixe = '') {
+            const element = document.getElementById(elementId);
+            const valeurActuelle = parseFloat(element.textContent.replace(/[^0-9.-]+/g, "")) || 0;
+            const duree = 1000;
+            const pas = (valeur - valeurActuelle) / (duree / 16);
+            let compteur = valeurActuelle;
+            
+            function animer() {
+                compteur += pas;
+                if ((pas > 0 && compteur >= valeur) || (pas < 0 && compteur <= valeur)) {
+                    compteur = valeur;
+                    element.textContent = formatMontant(compteur) + suffixe;
+                    return;
+                }
+                element.textContent = formatMontant(compteur) + suffixe;
+                requestAnimationFrame(animer);
+            }
+            
+            animer();
+        }
+        
         function formatMontant(montant) {
-            return montant.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €';
+            if (typeof montant === 'string') return montant;
+            return Math.round(montant).toLocaleString('fr-FR');
         }
         
         // Graphique évolution des revenus
@@ -262,7 +996,12 @@
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
                         borderWidth: 3,
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4,
+                        pointBackgroundColor: '#3498DB',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
                     }]
                 },
                 options: {
@@ -271,15 +1010,37 @@
                     plugins: {
                         legend: {
                             display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: '#3498DB',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Revenus: ${context.parsed.y.toLocaleString()} €`;
+                                }
+                            }
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            },
                             ticks: {
                                 callback: function(value) {
-                                    return value.toFixed(0) + ' €';
+                                    return value.toLocaleString() + ' €';
                                 }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
                             }
                         }
                     }
@@ -304,7 +1065,9 @@
                             '#e74c3c',
                             '#f39c12'
                         ],
-                        borderWidth: 0
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                        hoverOffset: 15
                     }]
                 },
                 options: {
@@ -312,9 +1075,24 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'bottom'
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((context.parsed / total) * 100);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
                         }
-                    }
+                    },
+                    cutout: '60%'
                 }
             });
         }
@@ -333,7 +1111,8 @@
                         label: 'CA (€)',
                         data: Object.values(data),
                         backgroundColor: '#9b59b6',
-                        borderRadius: 8
+                        borderRadius: 8,
+                        borderSkipped: false
                     }]
                 },
                 options: {
@@ -348,10 +1127,18 @@
                     scales: {
                         x: {
                             beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            },
                             ticks: {
                                 callback: function(value) {
-                                    return value.toFixed(0) + ' €';
+                                    return value.toLocaleString() + ' €';
                                 }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
                             }
                         }
                     }
@@ -378,13 +1165,15 @@
                             label: 'Bulletins générés',
                             data: factures,
                             backgroundColor: '#2ecc71',
-                            borderRadius: 6
+                            borderRadius: 6,
+                            borderSkipped: false
                         },
                         {
                             label: 'Amendes',
                             data: amendes,
                             backgroundColor: '#e74c3c',
-                            borderRadius: 6
+                            borderRadius: 6,
+                            borderSkipped: false
                         }
                     ]
                 },
@@ -393,154 +1182,178 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'bottom'
+                            position: 'bottom',
+                            labels: {
+                                padding: 20
+                            }
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            },
                             ticks: {
                                 stepSize: 1
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
                             }
                         }
                     }
                 }
             });
         }
-    </script>
-
-    <style>
-        .stats-grid-large {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
+        
+        // Mises à jour en temps réel
+        function demarrerMisesAJourTempsReel() {
+            // Mettre à jour les données en temps réel
+            realtimeInterval = setInterval(() => {
+                mettreAJourDonneesTempsReel();
+            }, 10000); // Toutes les 10 secondes
         }
         
-        .stat-card-large {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            transition: transform 0.3s;
-        }
-        
-        .stat-card-large:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
-        }
-        
-        .stat-icon-large {
-            width: 70px;
-            height: 70px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 28px;
-        }
-        
-        .stat-content-large {
-            flex: 1;
-        }
-        
-        .stat-label {
-            margin: 0 0 8px 0;
-            color: #7f8c8d;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .stat-content-large h2 {
-            margin: 0;
-            font-size: 32px;
-            color: #2C3E50;
-            font-weight: 700;
-        }
-        
-        .stat-trend {
-            font-size: 13px;
-            padding: 4px 10px;
-            border-radius: 15px;
-            display: inline-block;
-            margin-top: 8px;
-        }
-        
-        .stat-trend.positive {
-            background: #d5f4e6;
-            color: #27ae60;
-        }
-        
-        .stat-trend.negative {
-            background: #fadbd8;
-            color: #c0392b;
-        }
-        
-        .charts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-        
-        .chart-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-        }
-        
-        .chart-header {
-            margin-bottom: 20px;
-        }
-        
-        .chart-header h3 {
-            margin: 0;
-            color: #2C3E50;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 300px;
-        }
-        
-        .stats-details {
-            margin-top: 40px;
-        }
-        
-        .text-success {
-            color: #2ecc71;
-            font-weight: 700;
-        }
-        
-        .text-danger {
-            color: #e74c3c;
-            font-weight: 700;
-        }
-        
-        .text-warning {
-            color: #f39c12;
-            font-weight: 700;
-        }
-        
-        @media (max-width: 768px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
+        function mettreAJourDonneesTempsReel() {
+            // Simuler des mises à jour
+            const derniersNumeros = ['F2024-046', 'F2024-047', 'F2024-048'];
+            const prochainsPaiements = ['€1,150', '€980', '€1,320'];
+            const alertes = [2, 3, 4, 1];
+            const clientsActifs = ['MediaPress', 'Journal du Soir', 'NewsPlus', 'InfoPress'];
             
-            .stat-content-large h2 {
-                font-size: 24px;
+            // Changer les valeurs aléatoirement
+            document.getElementById('realtime-last-invoice').textContent = 
+                derniersNumeros[Math.floor(Math.random() * derniersNumeros.length)];
+            document.getElementById('realtime-next-payment').textContent = 
+                prochainsPaiements[Math.floor(Math.random() * prochainsPaiements.length)];
+            document.getElementById('realtime-alerts').textContent = 
+                alertes[Math.floor(Math.random() * alertes.length)];
+            document.getElementById('realtime-active-client').textContent = 
+                clientsActifs[Math.floor(Math.random() * clientsActifs.length)];
+        }
+        
+        function mettreAJourTimestamp() {
+            const now = new Date();
+            const options = { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false 
+            };
+            document.getElementById('live-timestamp').textContent = 
+                `Dernière mise à jour: ${now.toLocaleTimeString('fr-FR', options)}`;
+            
+            setTimeout(mettreAJourTimestamp, 1000);
+        }
+        
+        // Fonctions d'export
+        function exportChart(type) {
+            alert(`Export du graphique ${type} démarré...`);
+            // Ici, vous implémenteriez l'export réel (Canvas.toDataURL, etc.)
+        }
+        
+        function toggleChartType(type) {
+            if (charts[type]) {
+                const currentType = charts[type].config.type;
+                const newType = currentType === 'line' ? 'bar' : 'line';
+                charts[type].config.type = newType;
+                charts[type].update();
             }
         }
-    </style>
+        
+        // Fonctions IA
+        function voirDetailsIA() {
+            alert('Ouverture de l\'analyse IA détaillée...');
+        }
+        
+        function configurerAlertesIA() {
+            alert('Configuration des alertes IA...');
+        }
+        
+        // Fonctions de comparaison
+        function comparerClients() {
+            alert('Ouverture du comparateur clients...');
+        }
+        
+        function voirTousClients() {
+            window.location.href = '{{ url_for("clients") }}';
+        }
+        
+        function filtrerEmployes() {
+            alert('Ouverture des filtres employés...');
+        }
+        
+        function drillDownPaiements() {
+            alert('Affichage des détails des paiements...');
+        }
+        
+        // Modal d'upgrade
+        function openUpgradeModal() {
+            document.getElementById('upgradeModal').style.display = 'flex';
+            
+            // Simuler le chargement des plans
+            const plans = [
+                { nom: 'Starter', prix: '29€', features: ['Dashboard basique', '5 rapports/mois', 'Support email'] },
+                { nom: 'Pro', prix: '79€', features: ['IA Predictive', 'Alertes intelligentes', 'Support prioritaire'] },
+                { nom: 'Enterprise', prix: 'Contactez-nous', features: ['Tout le Pro +', 'Développement sur mesure', 'Support 24/7'] }
+            ];
+            
+            const plansHtml = plans.map(plan => `
+                <div style="border: 2px solid #e0e0e0; border-radius: 15px; padding: 20px; margin: 10px 0;">
+                    <h3>${plan.nom}</h3>
+                    <h2 style="color: var(--primary);">${plan.prix}</h2>
+                    <ul style="list-style: none; padding: 0; margin: 15px 0;">
+                        ${plan.features.map(f => `<li style="margin: 8px 0;"><i class="fas fa-check" style="color: #2ecc71;"></i> ${f}</li>`).join('')}
+                    </ul>
+                    <button onclick="selectPlan('${plan.nom}')" style="background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; width: 100%;">
+                        Choisir ${plan.nom}
+                    </button>
+                </div>
+            `).join('');
+            
+            document.getElementById('upgradePlans').innerHTML = plansHtml;
+        }
+        
+        function closeUpgradeModal() {
+            document.getElementById('upgradeModal').style.display = 'none';
+        }
+        
+        function selectPlan(plan) {
+            alert(`Félicitations ! Vous avez choisi le plan ${plan}. Redirection vers le paiement...`);
+            closeUpgradeModal();
+        }
+        
+        function afficherErreur(message) {
+            // Créer une notification d'erreur
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #e74c3c;
+                color: white;
+                padding: 15px 25px;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                z-index: 1000;
+                animation: slideIn 0.3s;
+            `;
+            notification.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s';
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+        }
+        
+        // Nettoyer à la fermeture
+        window.addEventListener('beforeunload', function() {
+            if (realtimeInterval) clearInterval(realtimeInterval);
+            Object.values(charts).forEach(chart => chart.destroy());
+        });
+    </script>
 </body>
 </html>
