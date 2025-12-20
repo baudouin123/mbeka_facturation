@@ -25,8 +25,6 @@
                     <p><i class="fas fa-phone"></i> {{ entreprise.telephone }}</p>
                 </div>
                 <div class="user-info">
-                    <button id="theme-toggle" class="btn-logout" style="background: rgba(255,255,255,0.2); margin-right: 10px; cursor: pointer; border:none;"> 🌙 Nuit
-                    </button>
                     {% if current_user.is_authenticated %}
                     <span class="user-greeting">
                         <i class="fas fa-user-circle"></i> Bonjour, {{ current_user.prenom or current_user.username }}
@@ -482,30 +480,8 @@
         setInterval(updateTime, 1000);
         updateTime(); // Appeler immédiatement
     </script>
-<script>
-    // --- SCRIPT DARK MODE ---
-    const toggleButton = document.getElementById('theme-toggle');
-    const htmlElement = document.documentElement;
-
-    // Vérifier la sauvegarde au chargement
-    if (localStorage.getItem('theme') === 'dark') {
-        htmlElement.setAttribute('data-theme', 'dark');
-        toggleButton.innerHTML = '☀️ Jour';
-    }
-
-    toggleButton.addEventListener('click', () => {
-        if (htmlElement.getAttribute('data-theme') === 'dark') {
-            htmlElement.setAttribute('data-theme', 'light');
-            localStorage.setItem('theme', 'light');
-            toggleButton.innerHTML = '🌙 Nuit';
-        } else {
-            htmlElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
-            toggleButton.innerHTML = '☀️ Jour';
-        }
-    });
-</script>
 </body>
 </body>
 </html>
+
 
