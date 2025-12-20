@@ -1216,4 +1216,81 @@ textarea.form-control {
 
 .rounded-xl {
     border-radius: 15px;
+
+}
+
+
+/* ============================================================================
+   MODE NUIT (DARK MODE) - AJOUTER CE BLOC A LA FIN DU FICHIER
+   ============================================================================ */
+
+/* 1. Variables globales pour le mode sombre */
+[data-theme="dark"] {
+    --dark-bg-body: linear-gradient(135deg, #121212 0%, #2d3436 100%);
+    --dark-bg-card: #1e1e1e;
+    --dark-bg-alt: #2d2d2d;
+    --dark-text-main: #ecf0f1;
+    --dark-text-muted: #a0a0a0;
+    --dark-border: #444;
+}
+
+/* 2. Application des couleurs sur les éléments existants */
+[data-theme="dark"] body {
+    background: var(--dark-bg-body) !important;
+    color: var(--dark-text-main) !important;
+}
+
+/* Cartes et conteneurs blancs deviennent gris foncé */
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .section-card,
+[data-theme="dark"] .nav-link,
+[data-theme="dark"] .table-container,
+[data-theme="dark"] .form-section,
+[data-theme="dark"] .summary-grid,
+[data-theme="dark"] .modal-content {
+    background: var(--dark-bg-card) !important;
+    color: var(--dark-text-main) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+}
+
+/* Titres en mode nuit */
+[data-theme="dark"] h1, 
+[data-theme="dark"] h2, 
+[data-theme="dark"] h3, 
+[data-theme="dark"] .stat-content h3,
+[data-theme="dark"] .nav-link {
+    color: #ffffff !important;
+}
+
+/* Éléments gris clair deviennent gris un peu plus foncé */
+[data-theme="dark"] .action-card,
+[data-theme="dark"] .instruction-step,
+[data-theme="dark"] .info-card,
+[data-theme="dark"] .empty-state,
+[data-theme="dark"] .data-table th, 
+[data-theme="dark"] .data-table tbody tr:hover {
+    background: var(--dark-bg-alt) !important;
+    color: var(--dark-text-main) !important;
+    border-color: var(--dark-border);
+}
+
+/* Formulaires (Inputs) */
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .filter-select,
+[data-theme="dark"] .filter-input {
+    background-color: #2d2d2d !important;
+    border-color: #555 !important;
+    color: white !important;
+}
+
+/* Tableaux */
+[data-theme="dark"] .data-table td {
+    border-bottom: 1px solid var(--dark-border);
+    color: var(--dark-text-muted);
+}
+
+/* Navigation active reste bleue */
+[data-theme="dark"] .nav-link.active {
+    background: linear-gradient(135deg, #3498DB 0%, #2980b9 100%) !important;
+    color: white !important;
 }
