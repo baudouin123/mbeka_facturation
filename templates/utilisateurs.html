@@ -1776,6 +1776,75 @@
                 if (e.key === 'Enter') appliquerFiltres();
             });
         });
+
+        // ========================================================================
+        // CHARGEMENT DYNAMIQUE DES RÔLES DEPUIS L'API
+        // ========================================================================
+        
+        async function chargerRolesDynamiquement() {
+            try {
+                console.log('🔄 Chargement des rôles personnalisés...');
+                
+                const response = await fetch('/api/roles');
+                
+                if (!response.ok) {
+                    console.warn('⚠️ API /api/roles non disponible - Utilisation des rôles par défaut');
+                    return;
+                }
+                
+                const roles = await response.json();
+                console.log(`✅ ${roles.length} rôles chargés depuis l'API`);
+                
+                // Mettre à jour tous les selects de rôles
+                ['create-role', 'edit-role'].forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    
+                    if (select) {
+                        // Sauvegarder la valeur actuelle
+                        const valeurActuelle = select.value;
+                        
+                        // Vider et remplir
+                        select.innerHTML = '';
+                        
+                        roles.forEach(role => {
+                            const option = document.createElement('option');
+                            option.value = role.code;
+                            option.textContent = role.nom;
+                            option.style.color = role.couleur;
+                            
+                            if (role.est_systeme) {
+                                option.textContent += ' ⭐';
+                            }
+                            
+                            select.appendChild(option);
+                        });
+                        
+                        // Restaurer la valeur
+                        if (valeurActuelle) {
+                            select.value = valeurActuelle;
+                        }
+                        
+                        console.log(`✅ Select "${selectId}" mis à jour avec ${roles.length} rôles`);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('❌ Erreur chargement rôles:', error);
+                console.log('→ Les rôles par défaut du HTML seront utilisés');
+            }
+        }
+        
+        // Charger les rôles au démarrage
+        document.addEventListener('DOMContentLoaded', function() {
+            chargerStatistiques();
+            gestionPermissionsSelonRole();
+            chargerRolesDynamiquement(); // NOUVEAU !
+            
+            // Permettre la recherche avec Entrée
+            document.getElementById('filter-search').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') appliquerFiltres();
+            });
+        });
     </script>
 </body>
 </html>
