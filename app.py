@@ -721,6 +721,7 @@ class Client(db.Model):
     email = db.Column(db.String(100))
     telephone = db.Column(db.String(20))
     siret = db.Column(db.String(20))
+    numero_tva = db.Column(db.String(50))  # ← NOUVELLE LIGNE
     date_creation = db.Column(db.DateTime, default=datetime.now)
     factures = db.relationship('Facture', backref='client', lazy=True)
 
@@ -732,7 +733,8 @@ class Client(db.Model):
             'ville': self.ville,
             'email': self.email,
             'telephone': self.telephone,
-            'siret': self.siret
+            'siret': self.siret,
+            'numero_tva': self.numero_tva  # ← NOUVELLE LIGNE
         }
 
 class Employe(db.Model):
