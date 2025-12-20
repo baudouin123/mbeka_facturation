@@ -4317,6 +4317,7 @@ except Exception as e:
 class Role(db.Model):
     """Modèle pour les rôles personnalisables"""
     __tablename__ = 'role'
+    __table_args__ = {'extend_existing': True}
     
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(50), unique=True, nullable=False)
@@ -4349,15 +4350,15 @@ class Role(db.Model):
 class RolePermission(db.Model):
     """Permissions attachées à un rôle"""
     __tablename__ = 'role_permission'
+    __table_args__ = (
+        {'extend_existing': True},
+        db.UniqueConstraint('role_id', 'page', name='unique_role_page'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
     page = db.Column(db.String(50), nullable=False)
     actif = db.Column(db.Boolean, default=True)
-    
-    __table_args__ = (
-        db.UniqueConstraint('role_id', 'page', name='unique_role_page'),
-    )
 
 
 # ========================================================================
