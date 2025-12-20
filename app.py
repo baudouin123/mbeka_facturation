@@ -4288,18 +4288,6 @@ def auto_backup():
 try:
     from extensions_roles import init_roles
     from extensions_devis import init_devis
-    
-    init_roles(app, db)
-    init_devis(app, db)
-    
-    print("✅ Extensions ROLES et DEVIS chargées avec succès")
-except ImportError as e:
-    print(f"⚠️ Extensions non chargées: {e}")
-    print("Les fichiers extensions_roles.py et extensions_devis.py doivent être dans le même dossier que app.py")
-except Exception as e:
-    print(f"❌ Erreur chargement extensions: {e}")
-
-
 # ============================================================================
 # MODULE RÔLES PERSONNALISABLES - AJOUTÉ AUTOMATIQUEMENT
 # ============================================================================
