@@ -347,9 +347,7 @@ def check_authentication():
         'login',
         'forgot_password',
         'reset_password',
-        'static',
-        'create_emergency_admin',
-        'urgence_admin'
+        'static'
     ]
 
     # Routes API et system (ne pas vérifier les permissions)
@@ -1511,6 +1509,19 @@ def api_liste_utilisateurs():
     """API: Liste des utilisateurs"""
     users = Utilisateur.query.all()
     return jsonify([u.to_dict() for u in users])
+
+@app.route('/api/utilisateurs/<int:user_id>', methods=['GET'])
+@login_required
+def api_get_utilisateur(user_id):
+    """API: Récupérer les informations d'un utilisateur"""
+    try:
+        user = Utilisateur.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'Utilisateur introuvable'}), 404
+        
+        return jsonify(user.to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/utilisateurs/creer', methods=['POST'])
 @admin_required
