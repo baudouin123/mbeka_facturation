@@ -1004,7 +1004,7 @@ TAUX_TVA = 21.0
 # ============================================================================
 
 def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
-    """Génère un PDF de facture avec un design moderne et professionnel"""
+    """Génère un PDF de facture avec un design moderne et professionnel - VERSION CORRIGÉE"""
     c = canvas.Canvas(chemin_pdf, pagesize=A4)
     width, height = A4
 
@@ -1098,9 +1098,9 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
         except:
             pass
 
-    # --- CLIENT/EMPLOYÉ (Encadré) ---
+    # --- CLIENT/EMPLOYÉ (Encadré) - ✅ SECTION CORRIGÉE ---
     c.setFillColor(GRIS_CLAIR)
-    c.roundRect(width/2, y - 2.5*cm, width/2 - 1.5*cm, 2.2*cm, 0.3*cm, fill=1, stroke=0)
+    c.roundRect(width/2, y - 3.2*cm, width/2 - 1.5*cm, 2.9*cm, 0.3*cm, fill=1, stroke=0)
 
     c.setFillColor(BLEU_FONCE)
     c.setFont("Helvetica-Bold", 10)
@@ -1113,15 +1113,37 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
 
     if type_facture == 'client':
         c.setFont("Helvetica", 9)
+        y_offset = y - 1.7*cm
+        
+        # Adresse
         if data.get('destinataire_adresse'):
-            c.drawString(width/2 + 0.5*cm, y - 1.7*cm, data['destinataire_adresse'])
+            c.drawString(width/2 + 0.5*cm, y_offset, data['destinataire_adresse'])
+            y_offset -= 0.4*cm
+        
+        # Ville
         if data.get('destinataire_ville'):
-            c.drawString(width/2 + 0.5*cm, y - 2.1*cm, data['destinataire_ville'])
+            c.drawString(width/2 + 0.5*cm, y_offset, data['destinataire_ville'])
+            y_offset -= 0.4*cm
+        
+        # Téléphone (NOUVEAU)
+        if data.get('destinataire_telephone'):
+            c.drawString(width/2 + 0.5*cm, y_offset, f"Tél: {data['destinataire_telephone']}")
+            y_offset -= 0.4*cm
+        
+        # Email (NOUVEAU)
+        if data.get('destinataire_email'):
+            c.drawString(width/2 + 0.5*cm, y_offset, f"Email: {data['destinataire_email']}")
+            y_offset -= 0.4*cm
+        
+        # N° TVA (NOUVEAU)
+        if data.get('destinataire_numero_tva'):
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(width/2 + 0.5*cm, y_offset, f"N° TVA: {data['destinataire_numero_tva']}")
     else:
         c.setFont("Helvetica", 9)
         c.drawString(width/2 + 0.5*cm, y - 1.7*cm, f"Matricule: {data.get('matricule', 'N/A')}")
 
-    y -= 3.5*cm
+    y -= 4*cm
 
     # --- TABLEAU DES DÉTAILS ---
     c.setFont("Helvetica-Bold", 10)
@@ -1319,8 +1341,6 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     c.save()
 
     return total_brut, total_tva, total_ttc
-    #else:
-        #return total_brut, total_amendes, total_net
 
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
@@ -2014,10 +2034,13 @@ def generer_facture_client():
             'destinataire_nom': client.nom,
             'destinataire_adresse': client.adresse or '',
             'destinataire_ville': client.ville or '',
+            'destinataire_telephone': client.telephone or '',      # ← AJOUTÉ
+            'destinataire_email': client.email or '',              # ← AJOUTÉ
+            'destinataire_numero_tva': client.numero_tva or '',    # ← AJOUTÉ
             'details': details,
             'total_brut': total_brut,
-            'notes': notes_completes,  # ✅ Notes complètes avec réclamation
-            'appliquer_tva': appliquer_tva  # ✅ Option TVA
+            'notes': notes_completes,
+            'appliquer_tva': appliquer_tva
         }
 
         # Générer le nom du fichier PDF
@@ -2043,7 +2066,7 @@ def generer_facture_client():
             total_net=total_ttc,
             fichier_pdf=chemin_pdf,
             details_json=json.dumps(details, ensure_ascii=False),
-            notes=notes_completes,  # ✅ Sauvegarder les notes complètes
+            notes=notes_completes,
             statut='en_attente'
         )
 
