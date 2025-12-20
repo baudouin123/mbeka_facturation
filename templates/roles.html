@@ -174,6 +174,17 @@
                     `).join('');
                     
                     document.getElementById('listeRoles').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    document.getElementById('listeRoles').innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                Erreur de chargement des rôles. Vérifiez que l'API fonctionne.
+                            </div>
+                        </div>
+                    `;
                 });
         }
 
@@ -196,9 +207,15 @@
             document.getElementById('roleCouleur').value = '#3498db';
             document.getElementById('previewBadge').style.backgroundColor = '#3498db';
             
+            // Réactiver tous les champs
+            document.getElementById('roleNom').disabled = false;
+            document.getElementById('roleDescription').disabled = false;
+            document.getElementById('roleCouleur').disabled = false;
+            
             // Décocher toutes les permissions
             Object.keys(PAGES).forEach(code => {
-                document.getElementById('perm_' + code).checked = false;
+                const checkbox = document.getElementById('perm_' + code);
+                if (checkbox) checkbox.checked = false;
             });
             
             modalRole.show();
@@ -242,7 +259,8 @@
             
             const permissions = {};
             Object.keys(PAGES).forEach(code => {
-                permissions[code] = document.getElementById('perm_' + code).checked;
+                const checkbox = document.getElementById('perm_' + code);
+                permissions[code] = checkbox ? checkbox.checked : false;
             });
             
             const data = {
@@ -269,6 +287,10 @@
                 } else {
                     alert('Erreur: ' + result.error);
                 }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                alert('Erreur de connexion au serveur');
             });
         }
 
@@ -284,6 +306,10 @@
                     } else {
                         alert('Erreur: ' + result.error);
                     }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur de connexion au serveur');
                 });
         }
 
@@ -299,6 +325,10 @@
                     } else {
                         alert('Erreur: ' + result.error);
                     }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur de connexion au serveur');
                 });
         }
     </script>
