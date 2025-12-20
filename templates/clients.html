@@ -180,6 +180,11 @@
                         <label for="siret">Numéro SIRET</label>
                         <input type="text" id="siret" class="form-control">
                     </div>
+                    
+                    <div class="form-group">
+                        <label for="numero_tva">Numéro de TVA</label>
+                        <input type="text" id="numero_tva" class="form-control" placeholder="Ex: BE0123456789">
+                    </div>
                 </form>
             </div>
             
@@ -208,6 +213,7 @@
             document.getElementById('email').value = client.email || '';
             document.getElementById('telephone').value = client.telephone || '';
             document.getElementById('siret').value = client.siret || '';
+            document.getElementById('numero_tva').value = client.numero_tva || '';
             
             document.getElementById('modalClient').style.display = 'block';
         }
@@ -230,6 +236,7 @@
                 email: document.getElementById('email').value,
                 telephone: document.getElementById('telephone').value,
                 siret: document.getElementById('siret').value
+                numero_tva: document.getElementById('numero_tva').value
             };
 
             const url = id ? `/api/clients/${id}` : '/api/clients';
