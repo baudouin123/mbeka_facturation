@@ -2198,6 +2198,26 @@ def chat():
         entreprise=VOTRE_ENTREPRISE
     )
 
+@app.route('/test-chat-models')
+def test_chat_models():
+    """Route de diagnostic pour vérifier les modèles"""
+    try:
+        # Tester si les modèles existent
+        conv_count = Conversation.query.count()
+        msg_count = Message.query.count()
+        
+        return jsonify({
+            'status': 'OK',
+            'conversations': conv_count,
+            'messages': msg_count,
+            'models_loaded': True
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'ERROR',
+            'error': str(e),
+            'models_loaded': False
+        }), 500
 
 # ============================================================================
 # API REST : Créer ou obtenir une conversation
@@ -5688,30 +5708,8 @@ def statistiques_documents():
     
     return jsonify(stats)
         
-if __name__ == '__main__':
-    # ============================================================================
-    # SÉCURITÉ : Invalider toutes les sessions au démarrage
-    # ============================================================================
-    import secrets
-    import hashlib
-    
-    timestamp = datetime.now().isoformat()
-    new_secret = hashlib.sha256(f"mbeka-{timestamp}-{secrets.token_hex(16)}".encode()).hexdigest()
-    app.config['SECRET_KEY'] = new_secret
-    
-    print("🔒 Nouvelle clé de session générée - toutes les sessions précédentes invalidées")
-    
-    try:
-        flask_session_dir = os.path.join(os.path.dirname(__file__), 'flask_session')
-        if os.path.exists(flask_session_dir):
-            shutil.rmtree(flask_session_dir)
-            print("🔒 Dossier de sessions nettoyé")
-    except Exception as e:
-        pass
-    
-    # ============================================================================
-    
-    # ============================================================================
+
+# ============================================================================
 # INITIALISATION (Ceci s'exécute sur Render ET en local)
 # ============================================================================
 def initialiser_application():
@@ -5771,6 +5769,6 @@ if __name__ == '__main__':
     import hashlib
     timestamp = datetime.now().isoformat()
     app.config['SECRET_KEY'] = hashlib.sha256(f"mbeka-local-{timestamp}".encode()).hexdigest()
-     
+
     port = int(os.environ.get('PORT', 10000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
