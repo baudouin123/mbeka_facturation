@@ -34,6 +34,8 @@ from email import encoders
 from flask_session import Session
 import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
+from datetime import datetime
+from sqlalchemy import and_, or_
 
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
@@ -100,7 +102,7 @@ db = SQLAlchemy(app)
 
 # ✅ AJOUT : Activer la protection CSRF
 csrf = CSRFProtect(app)
-
+socketio = SocketIO(app, cors_allowed_origins="*", manage_session=False)
 # ✅ AJOUT : Configuration Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -949,6 +951,120 @@ class Document(db.Model):
         else:
             return f"{taille / (1024 * 1024 * 1024):.1f} Go"
 
+# ============================================================================
+# MODÈLES POUR LE SYSTÈME DE CHAT
+# ============================================================================   
+
+    class Conversation(db.Model):
+       """Modèle pour les conversations (privées ou groupes)"""
+    __tablename__ = 'conversation'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(200))
+    type = db.Column(db.String(20), default='prive')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relations
+    messages = db.relationship('Message', backref='conversation', lazy=True, cascade='all, delete-orphan')
+    participants = db.relationship('ConversationParticipant', backref='conversation', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<Conversation {self.id} - {self.nom or "Privée"}>'
+    
+    def to_dict(self, current_user_id=None):
+        dernier_message = Message.query.filter_by(conversation_id=self.id).order_by(Message.created_at.desc()).first()
+        
+        autre_participant = None
+        if self.type == 'prive' and current_user_id:
+            for p in self.participants:
+                if p.user_id != current_user_id:
+                    autre_participant = Utilisateur.query.get(p.user_id)
+                    break
+        
+        messages_non_lus = 0
+        if current_user_id:
+            messages_non_lus = Message.query.filter(
+                Message.conversation_id == self.id,
+                Message.user_id != current_user_id,
+                Message.lu == False
+            ).count()
+        
+        return {
+            'id': self.id,
+            'nom': self.nom,
+            'type': self.type,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
+            'dernier_message': dernier_message.to_dict() if dernier_message else None,
+            'participants': [p.to_dict() for p in self.participants],
+            'autre_participant': {
+                'id': autre_participant.id,
+                'username': autre_participant.username,
+                'nom_complet': autre_participant.nom_complet if hasattr(autre_participant, 'nom_complet') else autre_participant.username
+            } if autre_participant else None,
+            'messages_non_lus': messages_non_lus
+        }
+
+
+class ConversationParticipant(db.Model):
+    """Table d'association entre conversations et utilisateurs"""
+    __tablename__ = 'conversation_participant'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('utilisateur.id'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relations
+    user = db.relationship('Utilisateur', backref='conversations')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.user.username,
+            'nom_complet': self.user.nom_complet if hasattr(self.user, 'nom_complet') else self.user.username,
+            'joined_at': self.joined_at.strftime('%Y-%m-%d %H:%M:%S') if self.joined_at else None
+        }
+
+
+class Message(db.Model):
+    """Modèle pour les messages du chat"""
+    __tablename__ = 'message'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('utilisateur.id'), nullable=False)
+    
+    contenu = db.Column(db.Text, nullable=False)
+    type_message = db.Column(db.String(20), default='texte')
+    fichier_url = db.Column(db.String(500))
+    
+    lu = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relations
+    user = db.relationship('Utilisateur', backref='messages')
+    
+    def __repr__(self):
+        return f'<Message {self.id} de {self.user_id}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'conversation_id': self.conversation_id,
+            'user_id': self.user_id,
+            'username': self.user.username,
+            'nom_complet': self.user.nom_complet if hasattr(self.user, 'nom_complet') else self.user.username,
+            'contenu': self.contenu,
+            'type_message': self.type_message,
+            'fichier_url': self.fichier_url,
+            'lu': self.lu,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'created_at_format': self.created_at.strftime('%H:%M') if self.created_at else None
+        }
+
 
 # ============================================================================
 # CATÉGORIES PRÉDÉFINIES (constante)
@@ -1444,6 +1560,33 @@ def generer_pdf_facture(data, chemin_pdf, type_facture='client'):
     c.save()
 
     return total_brut, total_tva, total_ttc
+
+def get_or_create_conversation(user1_id, user2_id):
+    """Obtenir ou créer une conversation privée entre 2 utilisateurs"""
+    conv = Conversation.query.join(ConversationParticipant).filter(
+        Conversation.type == 'prive',
+        ConversationParticipant.user_id.in_([user1_id, user2_id])
+    ).group_by(Conversation.id).having(
+        db.func.count(ConversationParticipant.user_id) == 2
+    ).first()
+    
+    if conv:
+        participant_ids = [p.user_id for p in conv.participants]
+        if user1_id in participant_ids and user2_id in participant_ids:
+            return conv
+    
+    nouvelle_conv = Conversation(type='prive')
+    db.session.add(nouvelle_conv)
+    db.session.flush()
+    
+    p1 = ConversationParticipant(conversation_id=nouvelle_conv.id, user_id=user1_id)
+    p2 = ConversationParticipant(conversation_id=nouvelle_conv.id, user_id=user2_id)
+    
+    db.session.add(p1)
+    db.session.add(p2)
+    db.session.commit()
+    
+    return nouvelle_conv
 
 # ============================================================================
 # FILTRES JINJA PERSONNALISÉS
@@ -2029,6 +2172,307 @@ def nouvelle_facture_employe():
                            entreprise=VOTRE_ENTREPRISE,
                            numero_auto=numero_auto,
                            employes_avec_amendes=employes_avec_amendes)
+
+
+
+# ============================================================================
+# ROUTE : Page principale du chat
+# ============================================================================
+
+@app.route('/chat')
+@login_required
+def chat():
+    """Page principale du chat"""
+    # Récupérer tous les utilisateurs
+    utilisateurs = Utilisateur.query.filter(Utilisateur.id != current_user.id).all()
+    
+    # Récupérer les conversations de l'utilisateur
+    conversations_ids = [p.conversation_id for p in current_user.conversations]
+    conversations = Conversation.query.filter(Conversation.id.in_(conversations_ids)).order_by(Conversation.updated_at.desc()).all() if conversations_ids else []
+    
+    return render_template(
+        'chat.html',
+        utilisateurs=utilisateurs,
+        conversations=[c.to_dict(current_user.id) for c in conversations],
+        now=datetime.now(),
+        entreprise=VOTRE_ENTREPRISE
+    )
+
+
+# ============================================================================
+# API REST : Créer ou obtenir une conversation
+# ============================================================================
+
+@app.route('/api/chat/conversations/<int:user_id>', methods=['POST'])
+@login_required
+def creer_conversation(user_id):
+    """Créer ou obtenir une conversation privée avec un utilisateur"""
+    try:
+        autre_user = Utilisateur.query.get_or_404(user_id)
+        
+        if autre_user.id == current_user.id:
+            return jsonify({'error': 'Vous ne pouvez pas créer une conversation avec vous-même'}), 400
+        
+        conversation = get_or_create_conversation(current_user.id, user_id)
+        
+        return jsonify({
+            'success': True,
+            'conversation': conversation.to_dict(current_user.id)
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Erreur création conversation: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# API REST : Récupérer les messages d'une conversation
+# ============================================================================
+
+@app.route('/api/chat/conversations/<int:conversation_id>/messages')
+@login_required
+def get_messages(conversation_id):
+    """Récupérer les messages d'une conversation"""
+    try:
+        conversation = Conversation.query.get_or_404(conversation_id)
+        
+        participant_ids = [p.user_id for p in conversation.participants]
+        if current_user.id not in participant_ids:
+            return jsonify({'error': 'Accès non autorisé'}), 403
+        
+        limit = request.args.get('limit', 50, type=int)
+        messages = Message.query.filter_by(
+            conversation_id=conversation_id
+        ).order_by(Message.created_at.desc()).limit(limit).all()
+        
+        messages.reverse()
+        
+        Message.query.filter(
+            Message.conversation_id == conversation_id,
+            Message.user_id != current_user.id,
+            Message.lu == False
+        ).update({'lu': True})
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'messages': [m.to_dict() for m in messages]
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Erreur récupération messages: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# API REST : Créer un groupe
+# ============================================================================
+
+@app.route('/api/chat/groupes', methods=['POST'])
+@login_required
+def creer_groupe():
+    """Créer un nouveau groupe de discussion"""
+    try:
+        data = request.json
+        
+        nom = data.get('nom')
+        participant_ids = data.get('participants', [])
+        
+        if not nom:
+            return jsonify({'error': 'Le nom du groupe est obligatoire'}), 400
+        
+        if len(participant_ids) < 2:
+            return jsonify({'error': 'Un groupe doit avoir au moins 2 participants'}), 400
+        
+        groupe = Conversation(nom=nom, type='groupe')
+        db.session.add(groupe)
+        db.session.flush()
+        
+        p_createur = ConversationParticipant(
+            conversation_id=groupe.id,
+            user_id=current_user.id
+        )
+        db.session.add(p_createur)
+        
+        for user_id in participant_ids:
+            if user_id != current_user.id:
+                p = ConversationParticipant(
+                    conversation_id=groupe.id,
+                    user_id=user_id
+                )
+                db.session.add(p)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'conversation': groupe.to_dict(current_user.id)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Erreur création groupe: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# API REST : Marquer les messages comme lus
+# ============================================================================
+
+@app.route('/api/chat/conversations/<int:conversation_id>/marquer-lu', methods=['POST'])
+@login_required
+def marquer_messages_lus(conversation_id):
+    """Marquer tous les messages d'une conversation comme lus"""
+    try:
+        Message.query.filter(
+            Message.conversation_id == conversation_id,
+            Message.user_id != current_user.id,
+            Message.lu == False
+        ).update({'lu': True})
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Erreur marquage lu: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# WEBSOCKET : Connexion/Déconnexion
+# ============================================================================
+
+@socketio.on('connect')
+def handle_connect():
+    """Quand un utilisateur se connecte au chat"""
+    if current_user.is_authenticated:
+        app.logger.info(f"✅ User {current_user.username} connecté au chat")
+        emit('user_connected', {
+            'user_id': current_user.id,
+            'username': current_user.username
+        }, broadcast=True)
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Quand un utilisateur se déconnecte"""
+    if current_user.is_authenticated:
+        app.logger.info(f"❌ User {current_user.username} déconnecté du chat")
+        emit('user_disconnected', {
+            'user_id': current_user.id,
+            'username': current_user.username
+        }, broadcast=True)
+
+
+# ============================================================================
+# WEBSOCKET : Rejoindre une conversation
+# ============================================================================
+
+@socketio.on('join')
+def handle_join(data):
+    """Rejoindre une room de conversation"""
+    conversation_id = data.get('conversation_id')
+    
+    if not conversation_id:
+        return
+    
+    conversation = Conversation.query.get(conversation_id)
+    if not conversation:
+        return
+    
+    participant_ids = [p.user_id for p in conversation.participants]
+    if current_user.id not in participant_ids:
+        return
+    
+    room = f"conversation_{conversation_id}"
+    join_room(room)
+    
+    app.logger.info(f"User {current_user.username} a rejoint la conversation {conversation_id}")
+
+
+# ============================================================================
+# WEBSOCKET : Quitter une conversation
+# ============================================================================
+
+@socketio.on('leave')
+def handle_leave(data):
+    """Quitter une room de conversation"""
+    conversation_id = data.get('conversation_id')
+    
+    if not conversation_id:
+        return
+    
+    room = f"conversation_{conversation_id}"
+    leave_room(room)
+    
+    app.logger.info(f"User {current_user.username} a quitté la conversation {conversation_id}")
+
+
+# ============================================================================
+# WEBSOCKET : Envoyer un message
+# ============================================================================
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    """Envoyer un message dans une conversation"""
+    try:
+        conversation_id = data.get('conversation_id')
+        contenu = data.get('contenu', '').strip()
+        
+        if not contenu:
+            return
+        
+        conversation = Conversation.query.get(conversation_id)
+        if not conversation:
+            return
+        
+        participant_ids = [p.user_id for p in conversation.participants]
+        if current_user.id not in participant_ids:
+            return
+        
+        message = Message(
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+            contenu=contenu,
+            type_message='texte'
+        )
+        db.session.add(message)
+        
+        conversation.updated_at = datetime.now()
+        
+        db.session.commit()
+        
+        room = f"conversation_{conversation_id}"
+        emit('new_message', message.to_dict(), room=room)
+        
+        app.logger.info(f"Message envoyé dans conversation {conversation_id} par {current_user.username}")
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Erreur envoi message: {str(e)}", exc_info=True)
+
+
+# ============================================================================
+# WEBSOCKET : Indicateur "en train d'écrire..."
+# ============================================================================
+
+@socketio.on('typing')
+def handle_typing(data):
+    """Indicateur qu'un utilisateur est en train d'écrire"""
+    conversation_id = data.get('conversation_id')
+    is_typing = data.get('is_typing', False)
+    
+    if not conversation_id:
+        return
+    
+    room = f"conversation_{conversation_id}"
+    
+    emit('user_typing', {
+        'user_id': current_user.id,
+        'username': current_user.username,
+        'is_typing': is_typing
+    }, room=room, include_self=False)
 
 # ============================================================================
 # ROUTES POUR GÉNÉRER LES FACTURES
@@ -5315,4 +5759,5 @@ if __name__ == '__main__':
     print("   /roles                   - Gestion des rôles (admin)")
     print("="*60)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 10000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
