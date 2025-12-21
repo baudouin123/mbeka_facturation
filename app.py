@@ -875,6 +875,104 @@ class Facture(db.Model):
             'montant_paye': self.montant_paye,
             'reste_a_payer': self.total_net - self.montant_paye
         }
+# ============================================================================
+# MODÈLE DOCUMENT -                     
+#============================================================================
+
+class Document(db.Model):
+    """Modèle pour la gestion documentaire (factures externes, contrats, etc.)"""
+    __tablename__ = 'document'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(255), nullable=False)
+    nom_fichier_original = db.Column(db.String(255), nullable=False)
+    chemin_fichier = db.Column(db.String(500), nullable=False)
+    
+    # Catégories
+    categorie = db.Column(db.String(100), nullable=False)  # Eau, Électricité, Loyer, etc.
+    
+    # Métadonnées
+    type_fichier = db.Column(db.String(50))  # PDF, JPEG, PNG, XLSX, DOCX, etc.
+    taille_fichier = db.Column(db.Integer)  # en octets
+    
+    # Dates
+    date_document = db.Column(db.Date)  # Date du document (ex: date de facture)
+    date_upload = db.Column(db.DateTime, default=datetime.now)
+    
+    # Organisation
+    tags = db.Column(db.String(500))  # Tags séparés par des virgules
+    notes = db.Column(db.Text)  # Notes/description
+    
+    # Informations financières (optionnel)
+    montant = db.Column(db.Float)  # Montant de la facture si applicable
+    statut = db.Column(db.String(50))  # "payé", "en_attente", "archivé"
+    
+    # Relations
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    def __repr__(self):
+        return f'<Document {self.nom}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nom': self.nom,
+            'nom_fichier_original': self.nom_fichier_original,
+            'categorie': self.categorie,
+            'type_fichier': self.type_fichier,
+            'taille_fichier': self.taille_fichier,
+            'date_document': self.date_document.strftime('%Y-%m-%d') if self.date_document else None,
+            'date_upload': self.date_upload.strftime('%Y-%m-%d %H:%M') if self.date_upload else None,
+            'tags': self.tags.split(',') if self.tags else [],
+            'notes': self.notes,
+            'montant': self.montant,
+            'statut': self.statut,
+            'taille_formatee': self.format_taille()
+        }
+    
+    def format_taille(self):
+        """Formater la taille du fichier en Ko, Mo, etc."""
+        if not self.taille_fichier:
+            return "0 Ko"
+        
+        taille = self.taille_fichier
+        
+        if taille < 1024:
+            return f"{taille} o"
+        elif taille < 1024 * 1024:
+            return f"{taille / 1024:.1f} Ko"
+        elif taille < 1024 * 1024 * 1024:
+            return f"{taille / (1024 * 1024):.1f} Mo"
+        else:
+            return f"{taille / (1024 * 1024 * 1024):.1f} Go"
+
+
+# ============================================================================
+# CATÉGORIES PRÉDÉFINIES (constante)
+# ============================================================================
+CATEGORIES_DOCUMENTS = [
+    {'value': 'eau', 'label': '💧 Eau', 'icon': 'fa-tint'},
+    {'value': 'electricite', 'label': '⚡ Électricité', 'icon': 'fa-bolt'},
+    {'value': 'gaz', 'label': '🔥 Gaz', 'icon': 'fa-fire'},
+    {'value': 'loyer', 'label': '🏠 Loyer', 'icon': 'fa-home'},
+    {'value': 'materiel', 'label': '🛠️ Matériel', 'icon': 'fa-tools'},
+    {'value': 'telephonie', 'label': '📱 Téléphonie', 'icon': 'fa-phone'},
+    {'value': 'vehicules', 'label': '🚗 Véhicules', 'icon': 'fa-car'},
+    {'value': 'assurances', 'label': '💼 Assurances', 'icon': 'fa-shield-alt'},
+    {'value': 'banque', 'label': '🏦 Banque', 'icon': 'fa-university'},
+    {'value': 'administratif', 'label': '📄 Administratif', 'icon': 'fa-file-alt'},
+    {'value': 'comptabilite', 'label': '🧾 Comptabilité', 'icon': 'fa-calculator'},
+    {'value': 'fournisseurs', 'label': '📦 Fournisseurs', 'icon': 'fa-truck'},
+    {'value': 'juridique', 'label': '⚖️ Juridique', 'icon': 'fa-gavel'},
+    {'value': 'formation', 'label': '🎓 Formation', 'icon': 'fa-graduation-cap'},
+    {'value': 'autres', 'label': '📁 Autres', 'icon': 'fa-folder'}
+]
+
+STATUTS_DOCUMENTS = [
+    {'value': 'en_attente', 'label': 'En attente', 'color': 'warning'},
+    {'value': 'paye', 'label': 'Payé', 'color': 'success'},
+    {'value': 'archive', 'label': 'Archivé', 'color': 'secondary'}
+]
 
 # ============================================================================
 # FONCTION DE NUMÉROTATION UNIQUE
