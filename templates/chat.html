@@ -7,7 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Emoji Picker -->
+    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js" type="module"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         .chat-container {
             display: grid;
             grid-template-columns: 350px 1fr;
@@ -19,11 +27,12 @@
             box-shadow: 0 4px 15px var(--shadow);
         }
         
-        /* Liste des conversations */
+        /* Sidebar */
         .conversations-sidebar {
             border-right: 2px solid var(--border-color);
             display: flex;
             flex-direction: column;
+            background: var(--bg-card);
         }
         
         .sidebar-header {
@@ -38,6 +47,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            font-size: 18px;
         }
         
         .search-conversations {
@@ -47,10 +57,28 @@
             border-radius: 8px;
             background: rgba(255,255,255,0.2);
             color: white;
+            margin-bottom: 10px;
         }
         
         .search-conversations::placeholder {
             color: rgba(255,255,255,0.7);
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-add:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
         }
         
         .conversations-list {
@@ -88,6 +116,7 @@
             color: white;
             font-weight: bold;
             font-size: 20px;
+            flex-shrink: 0;
         }
         
         .conversation-info {
@@ -122,6 +151,7 @@
         .chat-area {
             display: flex;
             flex-direction: column;
+            background: var(--bg-primary);
         }
         
         .chat-header {
@@ -155,17 +185,18 @@
             flex: 1;
             overflow-y: auto;
             padding: 20px;
-            background: var(--bg-primary);
-        }
-        
-        .message-group {
-            margin-bottom: 20px;
         }
         
         .message {
             display: flex;
             gap: 12px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .message.own {
@@ -206,11 +237,30 @@
             padding: 10px 15px;
             word-wrap: break-word;
         }
+
+        .message-file {
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .message-file i {
+            font-size: 24px;
+        }
+
+        .message-file img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
         
         .message-time {
             font-size: 11px;
             margin-top: 4px;
             opacity: 0.7;
+            padding: 0 15px;
         }
         
         .typing-indicator {
@@ -230,7 +280,31 @@
         .chat-input-container {
             display: flex;
             gap: 10px;
+            align-items: flex-end;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-action {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
             align-items: center;
+            justify-content: center;
+        }
+
+        .btn-action:hover {
+            background: #e0e0e0;
+            transform: scale(1.1);
         }
         
         .chat-input {
@@ -241,6 +315,9 @@
             font-size: 15px;
             background: var(--bg-primary);
             color: var(--text-primary);
+            resize: none;
+            max-height: 120px;
+            font-family: inherit;
         }
         
         .chat-input:focus {
@@ -268,6 +345,7 @@
         .btn-send:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
         
         /* Empty state */
@@ -286,24 +364,131 @@
             margin-bottom: 20px;
             opacity: 0.3;
         }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .chat-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .conversations-sidebar {
-                display: none;
-            }
-            
-            .conversations-sidebar.mobile-visible {
-                display: flex;
-            }
-            
-            .chat-area.mobile-hidden {
-                display: none;
-            }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #3498DB, #2980B9);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 15px;
+            margin-top: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 2px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-primary, .btn-secondary {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498DB, #2980B9);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        /* File upload hidden */
+        #fileInput {
+            display: none;
+        }
+
+        /* Emoji picker custom */
+        emoji-picker {
+            --border-radius: 12px;
+            --border-color: var(--border-color);
+        }
+
+        .emoji-picker-container {
+            position: absolute;
+            bottom: 70px;
+            right: 20px;
+            display: none;
+            z-index: 100;
+        }
+
+        .emoji-picker-container.active {
+            display: block;
         }
     </style>
 </head>
@@ -326,12 +511,12 @@
 
         <main class="main-content">
             <div class="chat-container">
-                <!-- Sidebar des conversations -->
+                <!-- Sidebar -->
                 <div class="conversations-sidebar">
                     <div class="sidebar-header">
                         <h3><i class="fas fa-comments"></i> Conversations</h3>
                         <input type="text" class="search-conversations" id="searchConversations" placeholder="🔍 Rechercher...">
-                        <button class="btn-add" onclick="ouvrirModalNouvelleConv()" style="margin-top: 10px; width: 100%;">
+                        <button class="btn-add" onclick="ouvrirModalNouvelleConv()">
                             <i class="fas fa-plus"></i> Nouvelle conversation
                         </button>
                     </div>
@@ -369,9 +554,10 @@
                             </div>
                             {% endfor %}
                         {% else %}
-                        <div class="empty-state-small" style="padding: 40px 20px;">
-                            <p>Aucune conversation</p>
-                            <p>Cliquez sur "Nouvelle conversation" pour commencer</p>
+                        <div class="empty-state-small" style="padding: 40px 20px; text-align: center;">
+                            <i class="fas fa-comments" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 15px;"></i>
+                            <p style="color: var(--text-secondary);">Aucune conversation</p>
+                            <p style="color: var(--text-secondary); font-size: 13px;">Cliquez sur "Nouvelle conversation"</p>
                         </div>
                         {% endif %}
                     </div>
@@ -390,7 +576,7 @@
                             <div class="chat-header-info">
                                 <div class="chat-header-avatar" id="chatHeaderAvatar"></div>
                                 <div>
-                                    <h3 id="chatHeaderName" style="margin: 0;"></h3>
+                                    <h3 id="chatHeaderName" style="margin: 0; font-size: 18px;"></h3>
                                     <small id="typingIndicatorHeader" style="color: #3498DB; display: none;">
                                         <i>En train d'écrire...</i>
                                     </small>
@@ -401,12 +587,31 @@
                         <div class="chat-messages" id="chatMessages"></div>
 
                         <div class="chat-input-area">
+                            <div class="emoji-picker-container" id="emojiPickerContainer"></div>
+                            
                             <div class="chat-input-container">
-                                <input type="text" class="chat-input" id="messageInput" placeholder="Écrivez votre message..." autocomplete="off">
+                                <div class="input-actions">
+                                    <button class="btn-action" onclick="document.getElementById('fileInput').click()" title="Joindre un fichier">
+                                        <i class="fas fa-paperclip"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="toggleEmojiPicker()" title="Ajouter un emoji">
+                                        <i class="fas fa-smile"></i>
+                                    </button>
+                                </div>
+                                
+                                <textarea 
+                                    class="chat-input" 
+                                    id="messageInput" 
+                                    placeholder="Écrivez votre message..." 
+                                    rows="1"
+                                    autocomplete="off"></textarea>
+                                
                                 <button class="btn-send" id="btnSend" onclick="envoyerMessage()">
                                     <i class="fas fa-paper-plane"></i>
                                 </button>
                             </div>
+                            
+                            <input type="file" id="fileInput" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handleFileSelect(event)">
                         </div>
                     </div>
                 </div>
@@ -422,17 +627,19 @@
                 <button class="btn-close" onclick="fermerModale()">&times;</button>
             </div>
             <div class="modal-body">
-                <label>Sélectionnez un utilisateur :</label>
+                <label style="font-weight: 600; color: var(--text-primary);">Sélectionnez un utilisateur :</label>
                 <select id="selectUtilisateur" class="form-control">
                     <option value="">-- Choisir --</option>
                     {% for user in utilisateurs %}
-                    <option value="{{ user.id }}">{{ user.username }}</option>
+                    <option value="{{ user.id }}">{{ user.username }} - {{ user.nom }} {{ user.prenom }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="fermerModale()">Annuler</button>
-                <button class="btn-primary" onclick="demarrerConversation()">Démarrer</button>
+                <button class="btn-primary" onclick="demarrerConversation()">
+                    <i class="fas fa-check"></i> Démarrer
+                </button>
             </div>
         </div>
     </div>
@@ -446,13 +653,14 @@
         let currentConversationId = null;
         let typingTimeout = null;
         const currentUserId = {{ current_user.id }};
+        let emojiPickerElement = null;
         
         // ============================================================================
-        // INITIALISATION SOCKET.IO
+        // INITIALISATION
         // ============================================================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            // Connexion au serveur WebSocket
+            // Connexion Socket.IO
             socket = io();
             
             socket.on('connect', function() {
@@ -465,21 +673,21 @@
             
             // Écouter les nouveaux messages
             socket.on('new_message', function(message) {
+                console.log('📨 Nouveau message reçu:', message);
                 if (message.conversation_id === currentConversationId) {
                     afficherMessage(message);
                     scrollToBottom();
                     
-                    // Marquer comme lu si c'est le message d'un autre
                     if (message.user_id !== currentUserId) {
+                        playNotificationSound();
                         marquerCommeLu(currentConversationId);
                     }
                 }
                 
-                // Mettre à jour la liste des conversations
                 updateConversationsList(message.conversation_id);
             });
             
-            // Écouter l'indicateur "en train d'écrire"
+            // Indicateur "en train d'écrire"
             socket.on('user_typing', function(data) {
                 if (data.conversation_id === currentConversationId && data.user_id !== currentUserId) {
                     const indicator = document.getElementById('typingIndicatorHeader');
@@ -491,15 +699,13 @@
                 }
             });
             
-            // Listener pour la touche Entrée
-            document.getElementById('messageInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    envoyerMessage();
-                }
-            });
-            
-            // Listener pour l'indicateur "en train d'écrire"
-            document.getElementById('messageInput').addEventListener('input', function() {
+            // Auto-resize textarea
+            const messageInput = document.getElementById('messageInput');
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                
+                // Indicateur typing
                 if (!currentConversationId) return;
                 
                 socket.emit('typing', {
@@ -507,7 +713,6 @@
                     is_typing: true
                 });
                 
-                // Arrêter l'indicateur après 2 secondes d'inactivité
                 clearTimeout(typingTimeout);
                 typingTimeout = setTimeout(() => {
                     socket.emit('typing', {
@@ -516,8 +721,40 @@
                     });
                 }, 2000);
             });
+            
+            // Envoyer avec Ctrl+Enter
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    envoyerMessage();
+                }
+            });
+
+            // Initialiser emoji picker
+            initEmojiPicker();
         });
         
+        // ============================================================================
+        // EMOJI PICKER
+        // ============================================================================
+        
+        function initEmojiPicker() {
+            const container = document.getElementById('emojiPickerContainer');
+            emojiPickerElement = document.createElement('emoji-picker');
+            container.appendChild(emojiPickerElement);
+            
+            emojiPickerElement.addEventListener('emoji-click', event => {
+                const input = document.getElementById('messageInput');
+                input.value += event.detail.unicode;
+                input.focus();
+                toggleEmojiPicker();
+            });
+        }
+
+        function toggleEmojiPicker() {
+            const container = document.getElementById('emojiPickerContainer');
+            container.classList.toggle('active');
+        }
+
         // ============================================================================
         // GESTION DES CONVERSATIONS
         // ============================================================================
@@ -525,13 +762,13 @@
         async function ouvrirConversation(conversationId) {
             currentConversationId = conversationId;
             
-            // Marquer la conversation comme active
+            // Marquer comme active
             document.querySelectorAll('.conversation-item').forEach(item => {
                 item.classList.remove('active');
             });
             document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('active');
             
-            // Rejoindre la room WebSocket
+            // Rejoindre la room
             socket.emit('join', { conversation_id: conversationId });
             
             // Charger les messages
@@ -565,6 +802,7 @@
                 }
             } catch (e) {
                 console.error('Erreur chargement messages:', e);
+                alert('Erreur lors du chargement des messages');
             }
         }
         
@@ -574,16 +812,17 @@
             
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+            
+            const initial = message.nom_complet ? message.nom_complet[0].toUpperCase() : message.username[0].toUpperCase();
+            
             messageDiv.innerHTML = `
-                <div class="message-avatar">
-                    ${message.nom_complet ? message.nom_complet[0].toUpperCase() : message.username[0].toUpperCase()}
-                </div>
+                <div class="message-avatar">${initial}</div>
                 <div class="message-content">
                     <div class="message-bubble">
                         ${escapeHtml(message.contenu)}
                     </div>
                     <div class="message-time">
-                        ${message.created_at_format}
+                        ${message.created_at_format} ${isOwn && message.lu ? '✓✓' : isOwn ? '✓' : ''}
                     </div>
                 </div>
             `;
@@ -608,7 +847,6 @@
                     method: 'POST'
                 });
                 
-                // Retirer le badge de la conversation
                 const badge = document.querySelector(`[data-conversation-id="${conversationId}"] .conversation-badge`);
                 if (badge) {
                     badge.remove();
@@ -628,20 +866,40 @@
             
             if (!contenu || !currentConversationId) return;
             
-            // Envoyer via WebSocket
             socket.emit('send_message', {
                 conversation_id: currentConversationId,
                 contenu: contenu
             });
             
-            // Vider l'input
             input.value = '';
+            input.style.height = 'auto';
             
-            // Arrêter l'indicateur "en train d'écrire"
             socket.emit('typing', {
                 conversation_id: currentConversationId,
                 is_typing: false
             });
+        }
+
+        // ============================================================================
+        // GESTION DES FICHIERS
+        // ============================================================================
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || !currentConversationId) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('conversation_id', currentConversationId);
+
+            try {
+                // TODO: Implémenter l'upload de fichiers côté serveur
+                alert('Upload de fichiers : fonctionnalité à implémenter côté serveur');
+                console.log('Fichier sélectionné:', file.name);
+            } catch (e) {
+                console.error('Erreur upload:', e);
+                alert('Erreur lors de l\'envoi du fichier');
+            }
         }
         
         // ============================================================================
@@ -667,14 +925,19 @@
             
             try {
                 const response = await fetch(`/api/chat/conversations/${userId}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
                     fermerModale();
-                    location.reload(); // Recharger pour afficher la nouvelle conversation
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
                 }
             } catch (e) {
                 console.error('Erreur création conversation:', e);
@@ -696,10 +959,15 @@
             div.textContent = text;
             return div.innerHTML;
         }
-        
+
+        function playNotificationSound() {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVKzn77BdGAg+ltzy0YU2Bx1200'); 
+            audio.volume = 0.3;
+            audio.play().catch(e => console.log('Notification son désactivée'));
+        }
+
         async function updateConversationsList(conversationId) {
-            // Optionnel : rafraîchir la liste des conversations
-            // Pour l'instant, on peut juste recharger la page ou faire un fetch
+            // Optionnel : rafraîchir la liste
         }
         
         // Fermer modale en cliquant dehors
@@ -707,6 +975,11 @@
             const modal = document.getElementById('modalNouvConv');
             if (event.target == modal) {
                 fermerModale();
+            }
+
+            const emojiContainer = document.getElementById('emojiPickerContainer');
+            if (!event.target.closest('.emoji-picker-container') && !event.target.closest('.btn-action')) {
+                emojiContainer.classList.remove('active');
             }
         }
     </script>
