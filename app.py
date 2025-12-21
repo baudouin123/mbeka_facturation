@@ -955,8 +955,8 @@ class Document(db.Model):
 # MODÈLES POUR LE SYSTÈME DE CHAT
 # ============================================================================   
 
-    class Conversation(db.Model):
-       """Modèle pour les conversations (privées ou groupes)"""
+class Conversation(db.Model):
+    """Modèle pour les conversations (privées ou groupes)"""
     __tablename__ = 'conversation'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -5711,53 +5711,66 @@ if __name__ == '__main__':
     
     # ============================================================================
     
+    # ============================================================================
+# INITIALISATION (Ceci s'exécute sur Render ET en local)
+# ============================================================================
+def initialiser_application():
+    """Crée la BDD et l'admin au démarrage"""
     with app.app_context():
-        # Créer les tables si elles n'existent pas
+        # 1. Créer les tables
         db.create_all()
         
-        # Initialiser les rôles système
+        # 2. Initialiser les rôles
         try:
-            initialiser_roles_systeme()
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            if inspector.has_table("role"):
+                initialiser_roles_systeme()
         except Exception as e:
-            print(f"⚠️ Erreur initialisation rôles: {e}")
+            print(f"⚠️ Erreur init rôles: {e}")
         
-        # Créer un utilisateur admin par défaut s'il n'existe pas
-        if not Utilisateur.query.filter_by(username='admin').first():
-            admin = Utilisateur(
-                username='admin',
-                email='admin@mbeka.com',
-                nom='Administrateur',
-                prenom='Système',
-                role='admin',
-                actif=True
-            )
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            print("✅ Utilisateur admin créé (username: admin, password: admin123)")
-            print("⚠️  IMPORTANT: Changez ce mot de passe en production !")
-    
+        # 3. Créer admin par défaut
+        try:
+            if not Utilisateur.query.filter_by(username='admin').first():
+                admin = Utilisateur(
+                    username='admin',
+                    email='admin@mbeka.com',
+                    nom='Administrateur',
+                    prenom='Système',
+                    role='admin',
+                    actif=True
+                )
+                admin.set_password('admin123')
+                db.session.add(admin)
+                db.session.commit()
+                print("✅ Admin créé (user: admin / pass: admin123)")
+        except Exception as e:
+            print(f"⚠️ Erreur création admin: {e}")
+
+        # 4. Créer les dossiers nécessaires
+        os.makedirs('factures', exist_ok=True)
+        os.makedirs('static/images', exist_ok=True)
+        os.makedirs('templates', exist_ok=True)
+
+# --- EXÉCUTION IMMÉDIATE DE L'INITIALISATION ---
+# C'est cette ligne qui sauve ton déploiement sur Render
+initialiser_application()
+
+
+# ============================================================================
+# LANCEMENT LOCAL (Ignoré par Render, utilisé sur ton PC)
+# ============================================================================
+if __name__ == '__main__':
     print("\n" + "="*60)
-    print("🚀 APPLICATION DE FACTURATION MBEKA - SÉCURISÉE")
-    print("="*60)
-    print(f"Entreprise: {VOTRE_ENTREPRISE['nom']}")
-    print(f"TVA: {TAUX_TVA}%")
-    print("\n🔐 SÉCURITÉ:")
-    print("   ✅ Authentification obligatoire")
-    print("   ✅ Sessions sécurisées")
-    print("   ✅ Reconnexion requise au démarrage")
-    print("\n🔐 CONNEXION:")
-    print("   Username: admin")
-    print("   Password: admin123")
-    print("\n👉 Ouvrez votre navigateur et allez à :")
-    print("   http://localhost:5000")
-    print("\n📁 Routes principales:")
-    print("   /login                   - Connexion")
-    print("   /                        - Tableau de bord")
-    print("   /utilisateurs            - Gestion utilisateurs (admin)")
-    print("   /factures                - Toutes les factures")
-    print("   /roles                   - Gestion des rôles (admin)")
+    print("🚀 APPLICATION DÉMARRÉE EN LOCAL")
+    print("👉 http://localhost:5000")
     print("="*60)
     
+    # Génération d'une clé secrète temporaire pour le dev local
+    import secrets
+    import hashlib
+    timestamp = datetime.now().isoformat()
+    app.config['SECRET_KEY'] = hashlib.sha256(f"mbeka-local-{timestamp}".encode()).hexdigest()
+     
     port = int(os.environ.get('PORT', 10000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
