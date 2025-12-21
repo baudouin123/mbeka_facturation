@@ -2101,14 +2101,93 @@ def generer_facture_client():
 
 @app.route('/telecharger_facture/<int:facture_id>')
 def telecharger_facture(facture_id):
-    """Télécharger une facture"""
+    """Télécharger une facture - AVEC REGÉNÉRATION AUTOMATIQUE"""
     facture = Facture.query.get_or_404(facture_id)
-
-    if not facture.fichier_pdf or not os.path.exists(facture.fichier_pdf):
-        return "Fichier non trouvé", 404
-
-    nom_fichier = f"{facture.numero}.pdf"
-    return send_file(facture.fichier_pdf, as_attachment=True, download_name=nom_fichier)
+    
+    # Vérifier si le fichier existe sur le disque
+    if facture.fichier_pdf and os.path.exists(facture.fichier_pdf):
+        # Si le fichier existe, l'envoyer directement
+        nom_fichier = f"{facture.numero.replace('/', '_')}.pdf"
+        return send_file(facture.fichier_pdf, as_attachment=True, download_name=nom_fichier)
+    
+    # ✅ SINON : Regénérer le PDF à la volée depuis les données en base
+    app.logger.info(f"📄 Regénération de la facture {facture.numero}")
+    
+    try:
+        # Créer le dossier factures s'il n'existe pas
+        os.makedirs('factures', exist_ok=True)
+        
+        # Récupérer les détails depuis la base de données
+        details = json.loads(facture.details_json) if facture.details_json else []
+        
+        # Préparer les données pour le PDF
+        if facture.type_facture == 'client':
+            # Facture client
+            client = facture.client
+            
+            pdf_data = {
+                'numero_facture': facture.numero,
+                'date_facture': facture.date_facture.strftime('%d/%m/%Y'),
+                'date_debut': facture.date_debut.strftime('%Y-%m-%d') if facture.date_debut else None,
+                'date_fin': facture.date_fin.strftime('%Y-%m-%d') if facture.date_fin else None,
+                'destinataire_nom': client.nom,
+                'destinataire_adresse': client.adresse or '',
+                'destinataire_ville': client.ville or '',
+                'destinataire_telephone': client.telephone or '',
+                'destinataire_email': client.email or '',
+                'destinataire_numero_tva': client.numero_tva or '' if hasattr(client, 'numero_tva') else '',
+                'details': details,
+                'total_brut': facture.total_brut,
+                'notes': facture.notes or '',
+                'appliquer_tva': True  # Par défaut, ajustez si vous avez ce champ en base
+            }
+            
+        else:
+            # Facture employé
+            employe = facture.employe
+            
+            # Récupérer les amendes
+            amendes = []
+            if facture.details_json:
+                try:
+                    data = json.loads(facture.details_json)
+                    amendes = data.get('amendes', [])
+                except:
+                    amendes = []
+            
+            pdf_data = {
+                'numero_facture': facture.numero,
+                'date_facture': facture.date_facture.strftime('%d/%m/%Y'),
+                'date_debut': facture.date_debut.strftime('%Y-%m-%d') if facture.date_debut else None,
+                'date_fin': facture.date_fin.strftime('%Y-%m-%d') if facture.date_fin else None,
+                'destinataire_nom': f"{employe.prenom} {employe.nom}",
+                'matricule': employe.matricule,
+                'total_brut': facture.total_brut,
+                'amendes': amendes,
+                'total_amendes': sum(a.get('montant', 0) for a in amendes),
+                'notes': facture.notes or ''
+            }
+        
+        # Générer le nom du fichier
+        nom_fichier_base = f"Facture_{facture.numero.replace('/', '_')}.pdf"
+        chemin_pdf = os.path.join('factures', nom_fichier_base)
+        
+        # Regénérer le PDF
+        generer_pdf_facture(pdf_data, chemin_pdf, facture.type_facture)
+        
+        app.logger.info(f"✅ Facture {facture.numero} regénérée avec succès")
+        
+        # Envoyer le fichier
+        return send_file(
+            chemin_pdf,
+            as_attachment=True,
+            download_name=nom_fichier_base,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        app.logger.error(f"❌ Erreur regénération facture {facture.numero}: {str(e)}", exc_info=True)
+        return f"Erreur lors de la génération du PDF: {str(e)}", 500
 
 @app.route('/voir_facture/<int:facture_id>')
 def voir_facture(facture_id):
