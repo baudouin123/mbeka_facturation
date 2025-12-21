@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        .chat-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 0;
+            height: calc(100vh - 200px);
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px var(--shadow);
+        }
+        
+        /* Liste des conversations */
+        .conversations-sidebar {
+            border-right: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 2px solid var(--border-color);
+            background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%);
+            color: white;
+        }
+        
+        .sidebar-header h3 {
+            margin: 0 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .search-conversations {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .search-conversations::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .conversation-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .conversation-item:hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+        
+        .conversation-item.active {
+            background: rgba(52, 152, 219, 0.2);
+            border-left: 4px solid #3498DB;
+        }
+        
+        .conversation-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498DB, #9b59b6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        .conversation-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .conversation-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .conversation-last-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .conversation-badge {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        /* Zone de chat */
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 20px;
+            border-bottom: 2px solid var(--border-color);
+            background: var(--bg-card);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .chat-header-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498DB, #9b59b6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg-primary);
+        }
+        
+        .message-group {
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .message.own {
+            flex-direction: row-reverse;
+        }
+        
+        .message-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498DB, #9b59b6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .message-content {
+            max-width: 60%;
+        }
+        
+        .message.own .message-content {
+            background: #3498DB;
+            color: white;
+            border-radius: 15px 15px 0 15px;
+        }
+        
+        .message:not(.own) .message-content {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-radius: 15px 15px 15px 0;
+        }
+        
+        .message-bubble {
+            padding: 10px 15px;
+            word-wrap: break-word;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            margin-top: 4px;
+            opacity: 0.7;
+        }
+        
+        .typing-indicator {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+        
+        /* Zone de saisie */
+        .chat-input-area {
+            padding: 20px;
+            border-top: 2px solid var(--border-color);
+            background: var(--bg-card);
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 25px;
+            font-size: 15px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: #3498DB;
+        }
+        
+        .btn-send {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498DB, #2980B9);
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-send:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+        
+        .empty-state i {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .chat-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .conversations-sidebar {
+                display: none;
+            }
+            
+            .conversations-sidebar.mobile-visible {
+                display: flex;
+            }
+            
+            .chat-area.mobile-hidden {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-comments"></i> Chat Interne</h1>
+                    <p class="subtitle">Communication en temps réel</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="chat-container">
+                <!-- Sidebar des conversations -->
+                <div class="conversations-sidebar">
+                    <div class="sidebar-header">
+                        <h3><i class="fas fa-comments"></i> Conversations</h3>
+                        <input type="text" class="search-conversations" id="searchConversations" placeholder="🔍 Rechercher...">
+                        <button class="btn-add" onclick="ouvrirModalNouvelleConv()" style="margin-top: 10px; width: 100%;">
+                            <i class="fas fa-plus"></i> Nouvelle conversation
+                        </button>
+                    </div>
+                    
+                    <div class="conversations-list" id="conversationsList">
+                        {% if conversations %}
+                            {% for conv in conversations %}
+                            <div class="conversation-item" data-conversation-id="{{ conv.id }}" onclick="ouvrirConversation({{ conv.id }})">
+                                <div class="conversation-avatar">
+                                    {% if conv.type == 'prive' and conv.autre_participant %}
+                                        {{ conv.autre_participant.nom_complet[0]|upper }}
+                                    {% else %}
+                                        <i class="fas fa-users"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="conversation-info">
+                                    <div class="conversation-name">
+                                        {% if conv.type == 'prive' and conv.autre_participant %}
+                                            {{ conv.autre_participant.nom_complet }}
+                                        {% else %}
+                                            {{ conv.nom }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="conversation-last-message">
+                                        {% if conv.dernier_message %}
+                                            {{ conv.dernier_message.contenu[:50] }}...
+                                        {% else %}
+                                            Aucun message
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% if conv.messages_non_lus > 0 %}
+                                <span class="conversation-badge">{{ conv.messages_non_lus }}</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                        <div class="empty-state-small" style="padding: 40px 20px;">
+                            <p>Aucune conversation</p>
+                            <p>Cliquez sur "Nouvelle conversation" pour commencer</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Zone de chat -->
+                <div class="chat-area" id="chatArea">
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-comments"></i>
+                        <h3>Sélectionnez une conversation</h3>
+                        <p>Choisissez une conversation dans la liste pour commencer à discuter</p>
+                    </div>
+
+                    <div id="chatContent" style="display: none; flex-direction: column; height: 100%;">
+                        <div class="chat-header">
+                            <div class="chat-header-info">
+                                <div class="chat-header-avatar" id="chatHeaderAvatar"></div>
+                                <div>
+                                    <h3 id="chatHeaderName" style="margin: 0;"></h3>
+                                    <small id="typingIndicatorHeader" style="color: #3498DB; display: none;">
+                                        <i>En train d'écrire...</i>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-messages" id="chatMessages"></div>
+
+                        <div class="chat-input-area">
+                            <div class="chat-input-container">
+                                <input type="text" class="chat-input" id="messageInput" placeholder="Écrivez votre message..." autocomplete="off">
+                                <button class="btn-send" id="btnSend" onclick="envoyerMessage()">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal nouvelle conversation -->
+    <div id="modalNouvConv" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Nouvelle conversation</h3>
+                <button class="btn-close" onclick="fermerModale()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Sélectionnez un utilisateur :</label>
+                <select id="selectUtilisateur" class="form-control">
+                    <option value="">-- Choisir --</option>
+                    {% for user in utilisateurs %}
+                    <option value="{{ user.id }}">{{ user.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModale()">Annuler</button>
+                <button class="btn-primary" onclick="demarrerConversation()">Démarrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // VARIABLES GLOBALES
+        // ============================================================================
+        
+        let socket;
+        let currentConversationId = null;
+        let typingTimeout = null;
+        const currentUserId = {{ current_user.id }};
+        
+        // ============================================================================
+        // INITIALISATION SOCKET.IO
+        // ============================================================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Connexion au serveur WebSocket
+            socket = io();
+            
+            socket.on('connect', function() {
+                console.log('✅ Connecté au serveur chat');
+            });
+            
+            socket.on('disconnect', function() {
+                console.log('❌ Déconnecté du serveur chat');
+            });
+            
+            // Écouter les nouveaux messages
+            socket.on('new_message', function(message) {
+                if (message.conversation_id === currentConversationId) {
+                    afficherMessage(message);
+                    scrollToBottom();
+                    
+                    // Marquer comme lu si c'est le message d'un autre
+                    if (message.user_id !== currentUserId) {
+                        marquerCommeLu(currentConversationId);
+                    }
+                }
+                
+                // Mettre à jour la liste des conversations
+                updateConversationsList(message.conversation_id);
+            });
+            
+            // Écouter l'indicateur "en train d'écrire"
+            socket.on('user_typing', function(data) {
+                if (data.conversation_id === currentConversationId && data.user_id !== currentUserId) {
+                    const indicator = document.getElementById('typingIndicatorHeader');
+                    if (data.is_typing) {
+                        indicator.style.display = 'block';
+                    } else {
+                        indicator.style.display = 'none';
+                    }
+                }
+            });
+            
+            // Listener pour la touche Entrée
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    envoyerMessage();
+                }
+            });
+            
+            // Listener pour l'indicateur "en train d'écrire"
+            document.getElementById('messageInput').addEventListener('input', function() {
+                if (!currentConversationId) return;
+                
+                socket.emit('typing', {
+                    conversation_id: currentConversationId,
+                    is_typing: true
+                });
+                
+                // Arrêter l'indicateur après 2 secondes d'inactivité
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.emit('typing', {
+                        conversation_id: currentConversationId,
+                        is_typing: false
+                    });
+                }, 2000);
+            });
+        });
+        
+        // ============================================================================
+        // GESTION DES CONVERSATIONS
+        // ============================================================================
+        
+        async function ouvrirConversation(conversationId) {
+            currentConversationId = conversationId;
+            
+            // Marquer la conversation comme active
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('active');
+            
+            // Rejoindre la room WebSocket
+            socket.emit('join', { conversation_id: conversationId });
+            
+            // Charger les messages
+            await chargerMessages(conversationId);
+            
+            // Afficher la zone de chat
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('chatContent').style.display = 'flex';
+            
+            // Mettre à jour le header
+            updateChatHeader(conversationId);
+            
+            // Marquer comme lu
+            marquerCommeLu(conversationId);
+        }
+        
+        async function chargerMessages(conversationId) {
+            try {
+                const response = await fetch(`/api/chat/conversations/${conversationId}/messages`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const messagesContainer = document.getElementById('chatMessages');
+                    messagesContainer.innerHTML = '';
+                    
+                    data.messages.forEach(message => {
+                        afficherMessage(message);
+                    });
+                    
+                    scrollToBottom();
+                }
+            } catch (e) {
+                console.error('Erreur chargement messages:', e);
+            }
+        }
+        
+        function afficherMessage(message) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const isOwn = message.user_id === currentUserId;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+            messageDiv.innerHTML = `
+                <div class="message-avatar">
+                    ${message.nom_complet ? message.nom_complet[0].toUpperCase() : message.username[0].toUpperCase()}
+                </div>
+                <div class="message-content">
+                    <div class="message-bubble">
+                        ${escapeHtml(message.contenu)}
+                    </div>
+                    <div class="message-time">
+                        ${message.created_at_format}
+                    </div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+        }
+        
+        function updateChatHeader(conversationId) {
+            const convElement = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+            if (!convElement) return;
+            
+            const name = convElement.querySelector('.conversation-name').textContent;
+            const avatar = convElement.querySelector('.conversation-avatar').textContent;
+            
+            document.getElementById('chatHeaderName').textContent = name;
+            document.getElementById('chatHeaderAvatar').textContent = avatar;
+        }
+        
+        async function marquerCommeLu(conversationId) {
+            try {
+                await fetch(`/api/chat/conversations/${conversationId}/marquer-lu`, {
+                    method: 'POST'
+                });
+                
+                // Retirer le badge de la conversation
+                const badge = document.querySelector(`[data-conversation-id="${conversationId}"] .conversation-badge`);
+                if (badge) {
+                    badge.remove();
+                }
+            } catch (e) {
+                console.error('Erreur marquage lu:', e);
+            }
+        }
+        
+        // ============================================================================
+        // ENVOI DE MESSAGES
+        // ============================================================================
+        
+        function envoyerMessage() {
+            const input = document.getElementById('messageInput');
+            const contenu = input.value.trim();
+            
+            if (!contenu || !currentConversationId) return;
+            
+            // Envoyer via WebSocket
+            socket.emit('send_message', {
+                conversation_id: currentConversationId,
+                contenu: contenu
+            });
+            
+            // Vider l'input
+            input.value = '';
+            
+            // Arrêter l'indicateur "en train d'écrire"
+            socket.emit('typing', {
+                conversation_id: currentConversationId,
+                is_typing: false
+            });
+        }
+        
+        // ============================================================================
+        // NOUVELLE CONVERSATION
+        // ============================================================================
+        
+        function ouvrirModalNouvelleConv() {
+            document.getElementById('modalNouvConv').style.display = 'block';
+        }
+        
+        function fermerModale() {
+            document.getElementById('modalNouvConv').style.display = 'none';
+            document.getElementById('selectUtilisateur').value = '';
+        }
+        
+        async function demarrerConversation() {
+            const userId = document.getElementById('selectUtilisateur').value;
+            
+            if (!userId) {
+                alert('Veuillez sélectionner un utilisateur');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/chat/conversations/${userId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    fermerModale();
+                    location.reload(); // Recharger pour afficher la nouvelle conversation
+                }
+            } catch (e) {
+                console.error('Erreur création conversation:', e);
+                alert('Erreur lors de la création de la conversation');
+            }
+        }
+        
+        // ============================================================================
+        // UTILITAIRES
+        // ============================================================================
+        
+        function scrollToBottom() {
+            const container = document.getElementById('chatMessages');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function updateConversationsList(conversationId) {
+            // Optionnel : rafraîchir la liste des conversations
+            // Pour l'instant, on peut juste recharger la page ou faire un fetch
+        }
+        
+        // Fermer modale en cliquant dehors
+        window.onclick = function(event) {
+            const modal = document.getElementById('modalNouvConv');
+            if (event.target == modal) {
+                fermerModale();
+            }
+        }
+    </script>
+    
+    <script src="{{ url_for('static', filename='dark-mode.js') }}"></script>
+</body>
+</html>
