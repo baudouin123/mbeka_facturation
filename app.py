@@ -908,7 +908,7 @@ class Document(db.Model):
     statut = db.Column(db.String(50))  # "payé", "en_attente", "archivé"
     
     # Relations
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('utilisateur.id'))
     
     def __repr__(self):
         return f'<Document {self.nom}>'
