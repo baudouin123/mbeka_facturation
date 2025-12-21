@@ -31,6 +31,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from flask_session import Session
+import boto3
+from botocore.exceptions import NoCredentialsError, ClientError
 
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
