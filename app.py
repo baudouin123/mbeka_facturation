@@ -4973,28 +4973,34 @@ def documents():
     )
 
 
-# ============================================================================
-# ROUTE : Upload de document
-# ============================================================================
+# --- CONFIGURATION AWS S3 (Connexion au Cloud) ---
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.environ.get('AWS_REGION')
+)
+BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 
+# ============================================================================
+# ROUTE : Upload de document (VERSION AWS S3)
+# ============================================================================
 @app.route('/api/documents/upload', methods=['POST'])
 @login_required
 def upload_document():
-    """Upload d'un nouveau document"""
     try:
-        # Vérifier qu'un fichier a été envoyé
+        # Vérifications de base
         if 'fichier' not in request.files:
             return jsonify({'error': 'Aucun fichier fourni'}), 400
         
         fichier = request.files['fichier']
-        
         if fichier.filename == '':
             return jsonify({'error': 'Nom de fichier vide'}), 400
         
         if not allowed_file(fichier.filename):
             return jsonify({'error': 'Type de fichier non autorisé'}), 400
         
-        # Récupérer les données du formulaire
+        # Récupération des données du formulaire
         nom = request.form.get('nom', fichier.filename)
         categorie = request.form.get('categorie', 'autres')
         date_document = request.form.get('date_document')
@@ -5003,31 +5009,28 @@ def upload_document():
         montant = request.form.get('montant')
         statut = request.form.get('statut', 'en_attente')
         
-        # Créer le dossier de destination
-        categorie_folder = os.path.join(UPLOAD_FOLDER, categorie)
-        os.makedirs(categorie_folder, exist_ok=True)
-        
-        # Sécuriser le nom du fichier
+        # Préparation pour S3 (Nom unique)
         nom_fichier = secure_filename(fichier.filename)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        nom_fichier_unique = f"{timestamp}_{nom_fichier}"
+        # On crée le chemin S3 : categorie/date_nom.pdf
+        chemin_s3 = f"{categorie}/{timestamp}_{nom_fichier}"
         
-        chemin_complet = os.path.join(categorie_folder, nom_fichier_unique)
+        # --- ENVOI VERS AMAZON S3 ---
+        s3_client.upload_fileobj(
+            fichier,
+            BUCKET_NAME,
+            chemin_s3,
+            ExtraArgs={'ContentType': fichier.content_type}
+        )
         
-        # Sauvegarder le fichier
-        fichier.save(chemin_complet)
-        
-        # Obtenir la taille du fichier
-        taille_fichier = os.path.getsize(chemin_complet)
-        
-        # Créer l'enregistrement en base de données
+        # Enregistrement en Base de Données
         document = Document(
             nom=nom,
             nom_fichier_original=fichier.filename,
-            chemin_fichier=chemin_complet,
+            chemin_fichier=chemin_s3,  # C'est la clé S3 qui est stockée
             categorie=categorie,
             type_fichier=get_file_type(fichier.filename),
-            taille_fichier=taille_fichier,
+            taille_fichier=0, # Optionnel sur S3
             date_document=datetime.strptime(date_document, '%Y-%m-%d').date() if date_document else None,
             tags=tags,
             notes=notes,
@@ -5039,68 +5042,41 @@ def upload_document():
         db.session.add(document)
         db.session.commit()
         
-        app.logger.info(f"✅ Document uploadé: {nom} ({taille_fichier} octets)")
-        
         return jsonify({
-            'success': True,
-            'message': 'Document uploadé avec succès',
+            'success': True, 
+            'message': 'Document sécurisé sur AWS S3',
             'document': document.to_dict()
         }), 201
         
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"❌ Erreur upload document: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Erreur lors de l\'upload: {str(e)}'}), 500
-
+        app.logger.error(f"❌ Erreur Upload S3: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500
 
 # ============================================================================
-# ROUTE : Télécharger un document
+# ROUTES : Visualiser / Télécharger (VERSION AWS S3)
 # ============================================================================
-
 @app.route('/api/documents/<int:document_id>/telecharger')
-@login_required
-def telecharger_document(document_id):
-    """Télécharger un document"""
-    document = Document.query.get_or_404(document_id)
-    
-    # Vérifier que le document appartient à l'utilisateur
-    if document.user_id != current_user.id:
-        return "Accès non autorisé", 403
-    
-    if not os.path.exists(document.chemin_fichier):
-        return "Fichier non trouvé", 404
-    
-    return send_file(
-        document.chemin_fichier,
-        as_attachment=True,
-        download_name=document.nom_fichier_original
-    )
-
-
-# ============================================================================
-# ROUTE : Prévisualiser un document (PDF/Images)
-# ============================================================================
-
 @app.route('/api/documents/<int:document_id>/previsualiser')
 @login_required
-def previsualiser_document(document_id):
-    """Prévisualiser un document dans le navigateur"""
+def acces_document_s3(document_id):
+    """Génère un lien temporaire pour voir le fichier sur Amazon"""
     document = Document.query.get_or_404(document_id)
     
-    # Vérifier que le document appartient à l'utilisateur
+    # Sécurité
     if document.user_id != current_user.id:
-        return "Accès non autorisé", 403
+        return "Accès interdit", 403
     
-    if not os.path.exists(document.chemin_fichier):
-        return "Fichier non trouvé", 404
-    
-    # Déterminer le mimetype
-    mimetype, _ = mimetypes.guess_type(document.chemin_fichier)
-    
-    return send_file(
-        document.chemin_fichier,
-        mimetype=mimetype or 'application/octet-stream'
-    )
+    try:
+        # Générer une URL signée (valide 1 heure)
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': document.chemin_fichier},
+            ExpiresIn=3600
+        )
+        return redirect(url)
+    except Exception as e:
+        return f"Erreur S3: {str(e)}", 404
 
 
 # ============================================================================
@@ -5145,37 +5121,37 @@ def modifier_document(document_id):
 
 
 # ============================================================================
-# ROUTE : Supprimer un document
+# ROUTE : Supprimer un document (VERSION AWS S3)
 # ============================================================================
-
 @app.route('/api/documents/<int:document_id>', methods=['DELETE'])
 @login_required
 def supprimer_document(document_id):
-    """Supprimer un document"""
     document = Document.query.get_or_404(document_id)
     
-    # Vérifier que le document appartient à l'utilisateur
     if document.user_id != current_user.id:
-        return jsonify({'error': 'Accès non autorisé'}), 403
+        return jsonify({'error': 'Non autorisé'}), 403
     
     try:
-        # Supprimer le fichier physique
-        if os.path.exists(document.chemin_fichier):
-            os.remove(document.chemin_fichier)
-        
-        # Supprimer de la base de données
+        # 1. Supprimer le fichier chez Amazon S3
+        try:
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=document.chemin_fichier)
+        except Exception as s3_error:
+            # On continue même si S3 échoue (pour nettoyer la BDD)
+            app.logger.warning(f"Fichier S3 introuvable ou déjà supprimé: {s3_error}")
+
+        # 2. Supprimer la ligne dans la base de données
         db.session.delete(document)
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Document supprimé avec succès'
+            'message': 'Document supprimé définitivement'
         })
         
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"❌ Erreur suppression document: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Erreur: {str(e)}'}), 500
+        app.logger.error(f"❌ Erreur Suppression: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================================
