@@ -111,6 +111,34 @@
             color: white;
             border-color: #3498DB;
         }
+
+        /* --- CORRECTION POUR QUE LE BOUTON SOIT VISIBLE --- */
+        
+        /* On force une hauteur maximum pour le contenu du formulaire */
+        .modal-body {
+            max-height: 60vh !important;  /* Limite à 60% de la hauteur de l'écran */
+            overflow-y: auto !important;  /* Ajoute une barre de défilement verticale */
+            padding: 20px;
+        }
+
+        /* On s'assure que le pied de page (boutons) reste propre */
+        .modal-footer {
+            border-top: 1px solid #e0e0e0;
+            padding: 15px 20px;
+            background-color: #fff;
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        /* Ajustement pour les petits écrans */
+        .modal-content {
+            margin: 2% auto !important; /* Réduit la marge du haut */
+            max-height: 95vh;           /* Empêche la fenêtre de dépasser l'écran */
+            display: flex;
+            flex-direction: column;
+        }
     </style>
 </head>
 <body>
