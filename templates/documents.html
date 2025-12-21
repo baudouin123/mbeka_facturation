@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion Documentaire - Mbeka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .upload-zone {
+            border: 3px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: var(--bg-card);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #3498DB;
+            background: rgba(52, 152, 219, 0.05);
+        }
+        
+        .upload-zone i {
+            font-size: 48px;
+            color: #3498DB;
+            margin-bottom: 15px;
+        }
+        
+        .document-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .document-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px var(--shadow-hover);
+        }
+        
+        .document-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+        }
+        
+        .document-info {
+            flex: 1;
+        }
+        
+        .document-info h4 {
+            margin: 0 0 8px 0;
+            color: var(--text-primary);
+        }
+        
+        .document-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .document-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: #3498DB;
+            color: white;
+            font-size: 12px;
+            margin: 2px;
+        }
+        
+        .filter-bar {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .categorie-badge {
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+        }
+        
+        .categorie-badge:hover, .categorie-badge.active {
+            background: #3498DB;
+            color: white;
+            border-color: #3498DB;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Mbeka" class="logo-large">
+                <div class="logo-text">
+                    <h1><i class="fas fa-folder-open"></i> Gestion Documentaire</h1>
+                    <p class="subtitle">Tous vos documents d'entreprise organisés</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Accueil
+            </a>
+            <a href="{{ url_for('documents') }}" class="nav-link active">
+                <i class="fas fa-folder-open"></i> Documents
+            </a>
+            <a href="{{ url_for('clients') }}" class="nav-link">
+                <i class="fas fa-building"></i> Clients
+            </a>
+            <a href="{{ url_for('factures') }}" class="nav-link">
+                <i class="fas fa-receipt"></i> Factures
+            </a>
+        </nav>
+
+        <main class="main-content">
+            <!-- Statistiques -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #3498DB;">
+                        <i class="fas fa-file"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ stats.total }}</h3>
+                        <p>Documents Total</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #27ae60;">
+                        <i class="fas fa-folder"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ stats.par_categorie|length }}</h3>
+                        <p>Catégories Utilisées</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #9b59b6;">
+                        <i class="fas fa-calendar"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>{{ now.strftime('%B %Y') }}</h3>
+                        <p>Mois en cours</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zone d'upload -->
+            <div class="form-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> Ajouter un document</h2>
+                </div>
+                
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fichierInput').click()">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Glissez-déposez un fichier ici</h3>
+                    <p>ou cliquez pour sélectionner</p>
+                    <small>PDF, Images, Word, Excel (Max 50 Mo)</small>
+                </div>
+                
+                <form id="formUpload" style="display: none;">
+                    <input type="file" id="fichierInput" name="fichier" accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip">
+                </form>
+            </div>
+
+            <!-- Filtres -->
+            <div class="filter-bar">
+                <input type="text" id="searchInput" placeholder="🔍 Rechercher..." class="form-control" style="max-width: 300px;">
+                
+                <select id="filterCategorie" class="form-control" style="max-width: 200px;">
+                    <option value="tous">Toutes catégories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.value }}">{{ cat.label }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select id="filterStatut" class="form-control" style="max-width: 200px;">
+                    <option value="tous">Tous statuts</option>
+                    {% for statut in statuts %}
+                    <option value="{{ statut.value }}">{{ statut.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Liste des documents -->
+            <div class="form-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-list"></i> Mes Documents (<span id="countDocuments">{{ documents|length }}</span>)</h2>
+                </div>
+
+                <div id="documentsContainer">
+                    {% for doc in documents %}
+                    <div class="document-card" data-id="{{ doc.id }}" data-categorie="{{ doc.categorie }}" data-statut="{{ doc.statut }}">
+                        <div class="document-icon" style="background: {% if doc.type_fichier == 'PDF' %}#e74c3c{% elif doc.type_fichier == 'Image' %}#9b59b6{% elif doc.type_fichier == 'Excel' %}#27ae60{% elif doc.type_fichier == 'Word' %}#3498DB{% else %}#95a5a6{% endif %};">
+                            <i class="fas {% if doc.type_fichier == 'PDF' %}fa-file-pdf{% elif doc.type_fichier == 'Image' %}fa-image{% elif doc.type_fichier == 'Excel' %}fa-file-excel{% elif doc.type_fichier == 'Word' %}fa-file-word{% else %}fa-file{% endif %}"></i>
+                        </div>
+                        
+                        <div class="document-info">
+                            <h4>{{ doc.nom }}</h4>
+                            <div class="document-meta">
+                                <span><i class="fas fa-folder"></i> {{ doc.categorie|capitalize }}</span>
+                                <span><i class="fas fa-calendar"></i> {{ doc.date_document.strftime('%d/%m/%Y') if doc.date_document else 'N/A' }}</span>
+                                <span><i class="fas fa-hdd"></i> {{ doc.format_taille() }}</span>
+                                {% if doc.montant %}
+                                <span><i class="fas fa-euro-sign"></i> {{ "%.2f"|format(doc.montant) }} €</span>
+                                {% endif %}
+                            </div>
+                            {% if doc.tags %}
+                            <div style="margin-top: 8px;">
+                                {% for tag in doc.tags.split(',') %}
+                                <span class="tag">{{ tag.strip() }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="document-actions">
+                            <button class="btn-action" title="Prévisualiser" onclick="previsualiser({{ doc.id }})">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-action" title="Télécharger" onclick="telecharger({{ doc.id }})">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="btn-action" title="Modifier" onclick="editerDocument({{ doc.to_dict()|tojson }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-action btn-danger" title="Supprimer" onclick="supprimerDocument({{ doc.id }}, '{{ doc.nom }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty-state-small">
+                        <i class="fas fa-folder-open" style="font-size: 64px; color: #ccc; margin-bottom: 20px;"></i>
+                        <p>Aucun document pour le moment.</p>
+                        <p>Uploadez votre premier document ci-dessus !</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; {{ now.year }} {{ entreprise.nom }}</p>
+        </footer>
+    </div>
+
+    <!-- Modal Upload/Édition -->
+    <div id="modalDocument" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-upload"></i> <span id="modalTitle">Ajouter un document</span></h3>
+                <button class="btn-close" onclick="fermerModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formDocument">
+                    <input type="hidden" id="document_id">
+                    
+                    <div class="form-group">
+                        <label for="nom">Nom du document *</label>
+                        <input type="text" id="nom" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="categorie">Catégorie *</label>
+                            <select id="categorie" class="form-control" required>
+                                {% for cat in categories %}
+                                <option value="{{ cat.value }}">{{ cat.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="date_document">Date du document</label>
+                            <input type="date" id="date_document" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="montant">Montant (€)</label>
+                            <input type="number" id="montant" class="form-control" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="statut">Statut</label>
+                            <select id="statut" class="form-control">
+                                {% for statut in statuts %}
+                                <option value="{{ statut.value }}">{{ statut.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tags">Tags (séparés par des virgules)</label>
+                        <input type="text" id="tags" class="form-control" placeholder="2024, urgent, facture">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes">Notes / Description</label>
+                        <textarea id="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fermerModal()">Annuler</button>
+                <button class="btn-primary" onclick="sauvegarderDocument()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // GESTION UPLOAD ET DRAG & DROP
+        // ============================================================================
+        
+        const uploadZone = document.getElementById('uploadZone');
+        const fichierInput = document.getElementById('fichierInput');
+        
+        // Drag & Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.add('dragover');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.remove('dragover');
+            }, false);
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fichierInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            // Vérifier la taille (50 Mo max)
+            const maxSize = 50 * 1024 * 1024;
+            if (file.size > maxSize) {
+                alert('Fichier trop volumineux ! Maximum 50 Mo.');
+                return;
+            }
+            
+            // Pré-remplir le formulaire
+            document.getElementById('nom').value = file.name;
+            document.getElementById('date_document').value = new Date().toISOString().split('T')[0];
+            
+            // Ouvrir la modale
+            ouvrirModalDocument(file);
+        }
+        
+        function ouvrirModalDocument(file) {
+            document.getElementById('modalTitle').textContent = 'Ajouter un document';
+            document.getElementById('document_id').value = '';
+            document.getElementById('modalDocument').style.display = 'block';
+            
+            // Stocker le fichier temporairement
+            window.currentFile = file;
+        }
+        
+        async function sauvegarderDocument() {
+            const id = document.getElementById('document_id').value;
+            
+            if (id) {
+                // Modification
+                await modifierDocument(id);
+            } else {
+                // Upload
+                await uploadDocument();
+            }
+        }
+        
+        async function uploadDocument() {
+            const formData = new FormData();
+            
+            // Ajouter le fichier
+            if (!window.currentFile) {
+                alert('Aucun fichier sélectionné');
+                return;
+            }
+            
+            formData.append('fichier', window.currentFile);
+            formData.append('nom', document.getElementById('nom').value);
+            formData.append('categorie', document.getElementById('categorie').value);
+            formData.append('date_document', document.getElementById('date_document').value);
+            formData.append('montant', document.getElementById('montant').value);
+            formData.append('statut', document.getElementById('statut').value);
+            formData.append('tags', document.getElementById('tags').value);
+            formData.append('notes', document.getElementById('notes').value);
+            
+            try {
+                const response = await fetch('/api/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    alert('Document uploadé avec succès !');
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Erreur : ' + error.error);
+                }
+            } catch (e) {
+                alert('Erreur de connexion');
+                console.error(e);
+            }
+        }
+        
+        // ============================================================================
+        // MODIFICATION
+        // ============================================================================
+        
+        function editerDocument(doc) {
+            document.getElementById('modalTitle').textContent = 'Modifier le document';
+            document.getElementById('document_id').value = doc.id;
+            document.getElementById('nom').value = doc.nom;
+            document.getElementById('categorie').value = doc.categorie;
+            document.getElementById('date_document').value = doc.date_document || '';
+            document.getElementById('montant').value = doc.montant || '';
+            document.getElementById('statut').value = doc.statut || 'en_attente';
+            document.getElementById('tags').value = doc.tags ? doc.tags.join(', ') : '';
+            document.getElementById('notes').value = doc.notes || '';
+            
+            document.getElementById('modalDocument').style.display = 'block';
+            window.currentFile = null; // Pas de fichier en modification
+        }
+        
+        async function modifierDocument(id) {
+            const data = {
+                nom: document.getElementById('nom').value,
+                categorie: document.getElementById('categorie').value,
+                date_document: document.getElementById('date_document').value,
+                montant: document.getElementById('montant').value,
+                statut: document.getElementById('statut').value,
+                tags: document.getElementById('tags').value,
+                notes: document.getElementById('notes').value
+            };
+            
+            try {
+                const response = await fetch(`/api/documents/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert('Document modifié avec succès !');
+                    location.reload();
+                } else {
+                    alert('Erreur lors de la modification');
+                }
+            } catch (e) {
+                alert('Erreur de connexion');
+                console.error(e);
+            }
+        }
+        
+        // ============================================================================
+        // SUPPRESSION
+        // ============================================================================
+        
+        async function supprimerDocument(id, nom) {
+            if (!confirm(`Voulez-vous vraiment supprimer "${nom}" ?`)) return;
+            
+            try {
+                const response = await fetch(`/api/documents/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Document supprimé');
+                    location.reload();
+                } else {
+                    alert('Erreur lors de la suppression');
+                }
+            } catch (e) {
+                alert('Erreur de connexion');
+                console.error(e);
+            }
+        }
+        
+        // ============================================================================
+        // TÉLÉCHARGEMENT ET PRÉVISUALISATION
+        // ============================================================================
+        
+        function telecharger(id) {
+            window.location.href = `/api/documents/${id}/telecharger`;
+        }
+        
+        function previsualiser(id) {
+            window.open(`/api/documents/${id}/previsualiser`, '_blank');
+        }
+        
+        // ============================================================================
+        // FILTRES ET RECHERCHE
+        // ============================================================================
+        
+        const searchInput = document.getElementById('searchInput');
+        const filterCategorie = document.getElementById('filterCategorie');
+        const filterStatut = document.getElementById('filterStatut');
+        
+        [searchInput, filterCategorie, filterStatut].forEach(el => {
+            el.addEventListener('input', filtrerDocuments);
+        });
+        
+        function filtrerDocuments() {
+            const search = searchInput.value.toLowerCase();
+            const categorie = filterCategorie.value;
+            const statut = filterStatut.value;
+            
+            const cards = document.querySelectorAll('.document-card');
+            let count = 0;
+            
+            cards.forEach(card => {
+                const nom = card.querySelector('h4').textContent.toLowerCase();
+                const cardCategorie = card.getAttribute('data-categorie');
+                const cardStatut = card.getAttribute('data-statut');
+                
+                const matchSearch = nom.includes(search);
+                const matchCategorie = categorie === 'tous' || cardCategorie === categorie;
+                const matchStatut = statut === 'tous' || cardStatut === statut;
+                
+                if (matchSearch && matchCategorie && matchStatut) {
+                    card.style.display = 'flex';
+                    count++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('countDocuments').textContent = count;
+        }
+        
+        // ============================================================================
+        // MODAL
+        // ============================================================================
+        
+        function fermerModal() {
+            document.getElementById('modalDocument').style.display = 'none';
+            document.getElementById('formDocument').reset();
+            window.currentFile = null;
+        }
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('modalDocument');
+            if (event.target == modal) {
+                fermerModal();
+            }
+        }
+    </script>
+</body>
+</html>
