@@ -297,10 +297,33 @@
         /* Styles spécifiques pour le bouton danger */
         .btn-danger { color: #e74c3c !important; }
         .btn-danger:hover { background: #e74c3c !important; color: white !important; }
+
+        /* --- AJOUT BARRE DE DÉFILEMENT (SCROLL) --- */
+    .modal-body {
+        max-height: 60vh !important;  /* Limite la hauteur */
+        overflow-y: auto !important;  /* Active le scroll */
+        padding: 20px;
+    }
+
+    .modal-content {
+        margin: 2% auto !important;
+        max-height: 95vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #e0e0e0;
+        padding: 15px 20px; /* Espace autour des boutons */
+        background: white;
+        border-radius: 0 0 12px 12px;
+        flex-shrink: 0; /* Empêche les boutons de s'écraser */
+    }
     </style>
     <script src="{{ url_for('static', filename='dark-mode.js') }}"></script>
 </body>
 </html>
+
 
 
 
