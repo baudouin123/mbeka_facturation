@@ -102,7 +102,14 @@ db = SQLAlchemy(app)
 
 # ✅ AJOUT : Activer la protection CSRF
 csrf = CSRFProtect(app)
-socketio = SocketIO(app, cors_allowed_origins="*", manage_session=False)
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    manage_session=False,
+    async_mode='threading',
+    logger=True,
+    engineio_logger=True
+)
 # ✅ AJOUT : Configuration Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
