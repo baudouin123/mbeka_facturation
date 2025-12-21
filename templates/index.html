@@ -76,8 +76,12 @@
                  <i class="fas fa-users-cog"></i> Utilisateurs
             </a>
             <a href="{{ url_for('documents') }}" class="nav-link">
-               <i class="fas fa-folder-open"></i> Documents
+                 <i class="fas fa-folder-open"></i> Documents
             </a>
+            <a href="{{ url_for('chat') }}" class="nav-link">
+                 <i class="fas fa-comments"></i> Chat
+            </a>
+            
         </nav>
 
         <!-- Messages flash -->
@@ -188,6 +192,17 @@
                                 <h3>Ajouter un Client</h3>
                                 <p>Enregistrer un nouveau client</p>
                                 <span class="action-shortcut">⌘ + ⇧ + C</span>
+                        
+                        <a href="{{ url_for('chat') }}" class="action-card">
+                            <div class="action-icon" style="background: #f39c12;">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <div class="action-content">
+                                <h3>Chat Interne</h3>
+                                <p>Messagerie temps réel</p>
+                                <span class="action-shortcut">⌘ + M</span>
+                            </div>
+                        </a>
                             </div>
                         </a>
                     </div>
@@ -1087,5 +1102,3 @@
     <script src="{{ url_for('static', filename='dark-mode.js') }}"></script>
 </body>
 </html>
-
-
