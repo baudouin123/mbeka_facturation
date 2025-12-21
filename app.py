@@ -4899,18 +4899,372 @@ def api_dupliquer_role(role_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# ============================================================================
+# ROUTES API POUR LA GESTION DOCUMENTAIRE
+# ============================================================================
+# À ajouter dans app.py (vers la fin, avant if __name__ == '__main__')
 
-# ========================================================================
-# INITIALISER LES RÔLES AU DÉMARRAGE
-# ========================================================================
+import os
+from werkzeug.utils import secure_filename
+import mimetypes
 
-# FIN DU MODULE RÔLES
+# Configuration upload
+UPLOAD_FOLDER = 'documents'
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip'}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 Mo
+
+def allowed_file(filename):
+    """Vérifier si l'extension du fichier est autorisée"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_file_type(filename):
+    """Déterminer le type de fichier"""
+    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    
+    types = {
+        'pdf': 'PDF',
+        'doc': 'Word',
+        'docx': 'Word',
+        'xls': 'Excel',
+        'xlsx': 'Excel',
+        'png': 'Image',
+        'jpg': 'Image',
+        'jpeg': 'Image',
+        'gif': 'Image',
+        'txt': 'Texte',
+        'zip': 'Archive'
+    }
+    
+    return types.get(ext, 'Autre')
+
+
+# ============================================================================
+# ROUTE : Page principale documents
 # ============================================================================
 
+@app.route('/documents')
+@login_required
+def documents():
+    """Page de gestion documentaire"""
+    documents = Document.query.filter_by(user_id=current_user.id).order_by(Document.date_upload.desc()).all()
+    
+    # Statistiques
+    stats = {
+        'total': len(documents),
+        'par_categorie': {}
+    }
+    
+    for doc in documents:
+        cat = doc.categorie
+        if cat not in stats['par_categorie']:
+            stats['par_categorie'][cat] = 0
+        stats['par_categorie'][cat] += 1
+    
+    return render_template(
+        'documents.html',
+        documents=documents,
+        categories=CATEGORIES_DOCUMENTS,
+        statuts=STATUTS_DOCUMENTS,
+        stats=stats,
+        now=datetime.now(),
+        entreprise=VOTRE_ENTREPRISE
+    )
+
+
 # ============================================================================
-# REPRISE DU CODE ORIGINAL
+# ROUTE : Upload de document
 # ============================================================================
 
+@app.route('/api/documents/upload', methods=['POST'])
+@login_required
+def upload_document():
+    """Upload d'un nouveau document"""
+    try:
+        # Vérifier qu'un fichier a été envoyé
+        if 'fichier' not in request.files:
+            return jsonify({'error': 'Aucun fichier fourni'}), 400
+        
+        fichier = request.files['fichier']
+        
+        if fichier.filename == '':
+            return jsonify({'error': 'Nom de fichier vide'}), 400
+        
+        if not allowed_file(fichier.filename):
+            return jsonify({'error': 'Type de fichier non autorisé'}), 400
+        
+        # Récupérer les données du formulaire
+        nom = request.form.get('nom', fichier.filename)
+        categorie = request.form.get('categorie', 'autres')
+        date_document = request.form.get('date_document')
+        tags = request.form.get('tags', '')
+        notes = request.form.get('notes', '')
+        montant = request.form.get('montant')
+        statut = request.form.get('statut', 'en_attente')
+        
+        # Créer le dossier de destination
+        categorie_folder = os.path.join(UPLOAD_FOLDER, categorie)
+        os.makedirs(categorie_folder, exist_ok=True)
+        
+        # Sécuriser le nom du fichier
+        nom_fichier = secure_filename(fichier.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        nom_fichier_unique = f"{timestamp}_{nom_fichier}"
+        
+        chemin_complet = os.path.join(categorie_folder, nom_fichier_unique)
+        
+        # Sauvegarder le fichier
+        fichier.save(chemin_complet)
+        
+        # Obtenir la taille du fichier
+        taille_fichier = os.path.getsize(chemin_complet)
+        
+        # Créer l'enregistrement en base de données
+        document = Document(
+            nom=nom,
+            nom_fichier_original=fichier.filename,
+            chemin_fichier=chemin_complet,
+            categorie=categorie,
+            type_fichier=get_file_type(fichier.filename),
+            taille_fichier=taille_fichier,
+            date_document=datetime.strptime(date_document, '%Y-%m-%d').date() if date_document else None,
+            tags=tags,
+            notes=notes,
+            montant=float(montant) if montant else None,
+            statut=statut,
+            user_id=current_user.id
+        )
+        
+        db.session.add(document)
+        db.session.commit()
+        
+        app.logger.info(f"✅ Document uploadé: {nom} ({taille_fichier} octets)")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Document uploadé avec succès',
+            'document': document.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"❌ Erreur upload document: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Erreur lors de l\'upload: {str(e)}'}), 500
+
+
+# ============================================================================
+# ROUTE : Télécharger un document
+# ============================================================================
+
+@app.route('/api/documents/<int:document_id>/telecharger')
+@login_required
+def telecharger_document(document_id):
+    """Télécharger un document"""
+    document = Document.query.get_or_404(document_id)
+    
+    # Vérifier que le document appartient à l'utilisateur
+    if document.user_id != current_user.id:
+        return "Accès non autorisé", 403
+    
+    if not os.path.exists(document.chemin_fichier):
+        return "Fichier non trouvé", 404
+    
+    return send_file(
+        document.chemin_fichier,
+        as_attachment=True,
+        download_name=document.nom_fichier_original
+    )
+
+
+# ============================================================================
+# ROUTE : Prévisualiser un document (PDF/Images)
+# ============================================================================
+
+@app.route('/api/documents/<int:document_id>/previsualiser')
+@login_required
+def previsualiser_document(document_id):
+    """Prévisualiser un document dans le navigateur"""
+    document = Document.query.get_or_404(document_id)
+    
+    # Vérifier que le document appartient à l'utilisateur
+    if document.user_id != current_user.id:
+        return "Accès non autorisé", 403
+    
+    if not os.path.exists(document.chemin_fichier):
+        return "Fichier non trouvé", 404
+    
+    # Déterminer le mimetype
+    mimetype, _ = mimetypes.guess_type(document.chemin_fichier)
+    
+    return send_file(
+        document.chemin_fichier,
+        mimetype=mimetype or 'application/octet-stream'
+    )
+
+
+# ============================================================================
+# ROUTE : Modifier un document
+# ============================================================================
+
+@app.route('/api/documents/<int:document_id>', methods=['PUT'])
+@login_required
+def modifier_document(document_id):
+    """Modifier les métadonnées d'un document"""
+    document = Document.query.get_or_404(document_id)
+    
+    # Vérifier que le document appartient à l'utilisateur
+    if document.user_id != current_user.id:
+        return jsonify({'error': 'Accès non autorisé'}), 403
+    
+    try:
+        data = request.json
+        
+        document.nom = data.get('nom', document.nom)
+        document.categorie = data.get('categorie', document.categorie)
+        document.tags = data.get('tags', document.tags)
+        document.notes = data.get('notes', document.notes)
+        document.montant = float(data.get('montant')) if data.get('montant') else document.montant
+        document.statut = data.get('statut', document.statut)
+        
+        if data.get('date_document'):
+            document.date_document = datetime.strptime(data['date_document'], '%Y-%m-%d').date()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Document modifié avec succès',
+            'document': document.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"❌ Erreur modification document: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Erreur: {str(e)}'}), 500
+
+
+# ============================================================================
+# ROUTE : Supprimer un document
+# ============================================================================
+
+@app.route('/api/documents/<int:document_id>', methods=['DELETE'])
+@login_required
+def supprimer_document(document_id):
+    """Supprimer un document"""
+    document = Document.query.get_or_404(document_id)
+    
+    # Vérifier que le document appartient à l'utilisateur
+    if document.user_id != current_user.id:
+        return jsonify({'error': 'Accès non autorisé'}), 403
+    
+    try:
+        # Supprimer le fichier physique
+        if os.path.exists(document.chemin_fichier):
+            os.remove(document.chemin_fichier)
+        
+        # Supprimer de la base de données
+        db.session.delete(document)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Document supprimé avec succès'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"❌ Erreur suppression document: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Erreur: {str(e)}'}), 500
+
+
+# ============================================================================
+# ROUTE : Rechercher des documents
+# ============================================================================
+
+@app.route('/api/documents/rechercher')
+@login_required
+def rechercher_documents():
+    """Rechercher des documents"""
+    query = Document.query.filter_by(user_id=current_user.id)
+    
+    # Filtres
+    categorie = request.args.get('categorie')
+    statut = request.args.get('statut')
+    recherche = request.args.get('q')
+    date_debut = request.args.get('date_debut')
+    date_fin = request.args.get('date_fin')
+    
+    if categorie and categorie != 'tous':
+        query = query.filter_by(categorie=categorie)
+    
+    if statut and statut != 'tous':
+        query = query.filter_by(statut=statut)
+    
+    if recherche:
+        query = query.filter(
+            db.or_(
+                Document.nom.ilike(f'%{recherche}%'),
+                Document.notes.ilike(f'%{recherche}%'),
+                Document.tags.ilike(f'%{recherche}%')
+            )
+        )
+    
+    if date_debut:
+        query = query.filter(Document.date_document >= datetime.strptime(date_debut, '%Y-%m-%d').date())
+    
+    if date_fin:
+        query = query.filter(Document.date_document <= datetime.strptime(date_fin, '%Y-%m-%d').date())
+    
+    documents = query.order_by(Document.date_upload.desc()).all()
+    
+    return jsonify({
+        'success': True,
+        'documents': [doc.to_dict() for doc in documents],
+        'count': len(documents)
+    })
+
+
+# ============================================================================
+# ROUTE : Statistiques documents
+# ============================================================================
+
+@app.route('/api/documents/statistiques')
+@login_required
+def statistiques_documents():
+    """Obtenir les statistiques des documents"""
+    documents = Document.query.filter_by(user_id=current_user.id).all()
+    
+    stats = {
+        'total': len(documents),
+        'par_categorie': {},
+        'par_statut': {},
+        'taille_totale': 0,
+        'par_mois': {}
+    }
+    
+    for doc in documents:
+        # Par catégorie
+        if doc.categorie not in stats['par_categorie']:
+            stats['par_categorie'][doc.categorie] = 0
+        stats['par_categorie'][doc.categorie] += 1
+        
+        # Par statut
+        if doc.statut not in stats['par_statut']:
+            stats['par_statut'][doc.statut] = 0
+        stats['par_statut'][doc.statut] += 1
+        
+        # Taille totale
+        if doc.taille_fichier:
+            stats['taille_totale'] += doc.taille_fichier
+        
+        # Par mois
+        if doc.date_upload:
+            mois = doc.date_upload.strftime('%Y-%m')
+            if mois not in stats['par_mois']:
+                stats['par_mois'][mois] = 0
+            stats['par_mois'][mois] += 1
+    
+    return jsonify(stats)
+        
 if __name__ == '__main__':
     # ============================================================================
     # SÉCURITÉ : Invalider toutes les sessions au démarrage
