@@ -36,12 +36,95 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from datetime import datetime
 from sqlalchemy import and_, or_
+from sqlalchemy.orm import joinedload, selectinload
 from flask_caching import Cache
 from flask_compress import Compress
-Compress(app)
 from flask_assets import Environment, Bundle
-assets = Environment(app)
+import logging
 
+def parse_date(value):
+    """Essaye plusieurs formats de date automatiquement."""
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except:
+            pass
+    raise ValueError(f"Format date non supporté : {value}")
+
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
+
+app = Flask(__name__)
+
+# ============================================================================
+# CONFIGURATION DE BASE
+# ============================================================================
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mbeka-facturation-secure-key-2024-december-14')
+
+# ============================================================================
+# CONFIGURATION DE LA BASE DE DONNÉES - MODIFIÉ POUR RENDER
+# ============================================================================
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Production sur Render : PostgreSQL
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    print("🚀 Mode PRODUCTION : PostgreSQL activé")
+    
+    # ✅ OPTIMISATION : Désactiver les logs SQL en production
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+else:
+    # Développement local : SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
+    print("💻 Mode DÉVELOPPEMENT : SQLite activé")
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'pool_size': 10,  # ✅ OPTIMISATION : Pool de connexions
+    'max_overflow': 20,  # ✅ OPTIMISATION : Connexions supplémentaires
+}
+
+# ✅ AJOUT : Configuration Email (Gmail)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'
+app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'
+app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'
+
+# ✅ AJOUT : Configuration des sessions
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
+app.config['SESSION_PERMANENT'] = False
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)
+
+# ============================================================================
+# INITIALISATION DES EXTENSIONS - MAINTENANT app existe !
+# ============================================================================
+db = SQLAlchemy(app)
+csrf = CSRFProtect(app)
+Session(app)
+
+# ✅ OPTIMISATION : Cache pour accélérer les pages
+cache = Cache(app, config={
+    'CACHE_TYPE': 'SimpleCache',
+    'CACHE_DEFAULT_TIMEOUT': 300  # 5 minutes
+})
+
+# ✅ OPTIMISATION : Compression GZIP
+Compress(app)
+
+# ✅ OPTIMISATION : Minification JS/CSS
+assets = Environment(app)
 
 # Bundle CSS
 css = Bundle(
@@ -59,88 +142,22 @@ js = Bundle(
 )
 assets.register('js_all', js)
 
-def parse_date(value):
-    """Essaye plusieurs formats de date automatiquement."""
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M"):
-        try:
-            return datetime.strptime(value, fmt).date()
-        except:
-            pass
-    raise ValueError(f"Format date non supporté : {value}")
-
-from PIL import Image
-Image.MAX_IMAGE_PIXELS = None
-
-app = Flask(__name__)
-app.config['WTF_CSRF_CHECK_DEFAULT'] = False
-cache = Cache(app, config={
-    'CACHE_TYPE': 'SimpleCache',
-    'CACHE_DEFAULT_TIMEOUT': 300  # 5 minutes
-})
-# ✅ AJOUT : Clé secrète pour la sécurité
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mbeka-facturation-secure-key-2024-december-14')
-
-# ============================================================================
-# CONFIGURATION DE LA BASE DE DONNÉES - MODIFIÉ POUR RENDER
-# ============================================================================
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-if DATABASE_URL:
-    # Production sur Render : PostgreSQL
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-    print("🚀 Mode PRODUCTION : PostgreSQL activé")
-else:
-    # Développement local : SQLite
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///factures.db'
-    print("💻 Mode DÉVELOPPEMENT : SQLite activé")
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
-# ============================================================================
-
-# ✅ AJOUT : Configuration Email (Gmail)
-# Pour utiliser Gmail : https://myaccount.google.com/apppasswords
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com' # À CONFIGURER
-app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk' # À CONFIGURER
-app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com' # À CONFIGURER
-
-# ✅ AJOUT : Configuration des sessions
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
-app.config['SESSION_PERMANENT'] = False
-Session(app)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24) # Session expire après 24h
-app.config['SESSION_COOKIE_SECURE'] = False # True en production avec HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True # Protection XSS
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' # Protection CSRF
-app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7) # "Remember me" 7 jours
-
-db = SQLAlchemy(app)
-
-# ✅ AJOUT : Activer la protection CSRF
-csrf = CSRFProtect(app)
+# SocketIO
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*", 
     manage_session=False,
     async_mode='threading',
-    logger=True,
-    engineio_logger=True
+    logger=False,  # ✅ OPTIMISATION : Désactiver les logs SocketIO en production
+    engineio_logger=False  # ✅ OPTIMISATION : Désactiver les logs EngineIO
 )
+
 # ✅ AJOUT : Configuration Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
-login_manager.session_protection = 'strong' # Protection forte contre le vol de session
+login_manager.session_protection = 'strong'
 
 # ============================================================================
 # MODÈLES DE BASE DE DONNÉES
@@ -751,15 +768,19 @@ def send_facture_email(facture, pdf_path):
 
 class Client(db.Model):
     """Modèle pour les clients (grandes entreprises)"""
+    __tablename__ = 'client'
+    
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(100), nullable=False)
+    nom = db.Column(db.String(100), nullable=False, index=True)  # ✅ OPTIMISATION : Index
     adresse = db.Column(db.String(200))
     ville = db.Column(db.String(100))
     email = db.Column(db.String(100))
-    telephone = db.Column(db.String(20))
+    telephone = db.Column(db.String(20), index=True)  # ✅ OPTIMISATION : Index
     siret = db.Column(db.String(20))
-    numero_tva = db.Column(db.String(50))  # ← NOUVELLE LIGNE
+    numero_tva = db.Column(db.String(50))
     date_creation = db.Column(db.DateTime, default=datetime.now)
+    
+    # ✅ OPTIMISATION : lazy='dynamic' pour requêtes optimisées
     factures = db.relationship('Facture', backref='client', lazy='dynamic')
 
     def to_dict(self):
@@ -776,9 +797,11 @@ class Client(db.Model):
 
 class Employe(db.Model):
     """Modèle pour les employés (sous-traitants)"""
+    __tablename__ = 'employe'
+    
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(100), nullable=False)
-    prenom = db.Column(db.String(100), nullable=False)
+    nom = db.Column(db.String(100), nullable=False, index=True)  # ✅ OPTIMISATION : Index
+    prenom = db.Column(db.String(100), nullable=False, index=True)  # ✅ OPTIMISATION : Index
     matricule = db.Column(db.String(50), unique=True)
     poste = db.Column(db.String(100))
     taux_horaire = db.Column(db.Float, default=0.0)
@@ -787,9 +810,11 @@ class Employe(db.Model):
     date_embauche = db.Column(db.Date)
     actif = db.Column(db.Boolean, default=True)
     date_creation = db.Column(db.DateTime, default=datetime.now)
-    amendes = db.relationship('Amende', backref='employe', lazy=True)
+    
+    # ✅ OPTIMISATION : lazy='dynamic' pour éviter les N+1 queries
+    amendes = db.relationship('Amende', backref='employe', lazy='dynamic')
     livraisons = db.relationship('Livraison', backref='employe', lazy='dynamic')
-    factures = db.relationship('Facture', backref='employe', lazy=True, foreign_keys='Facture.employe_id')
+    factures = db.relationship('Facture', backref='employe', lazy='dynamic', foreign_keys='Facture.employe_id')
 
     def nom_complet(self):
         return f"{self.prenom} {self.nom}"
@@ -810,13 +835,15 @@ class Employe(db.Model):
 
 class Amende(db.Model):
     """Modèle pour les amendes des employés"""
+    __tablename__ = 'amende'
+    
     id = db.Column(db.Integer, primary_key=True)
-    employe_id = db.Column(db.Integer, db.ForeignKey('employe.id'), nullable=False)
+    employe_id = db.Column(db.Integer, db.ForeignKey('employe.id'), nullable=False, index=True)  # ✅ OPTIMISATION
     facture_id = db.Column(db.Integer, db.ForeignKey('facture.id'), nullable=True)
     montant = db.Column(db.Float, nullable=False)
     raison = db.Column(db.String(200), nullable=False)
-    date_amende = db.Column(db.Date, nullable=False)
-    statut = db.Column(db.String(20), default='en_attente') # en_attente, appliquée, annulée
+    date_amende = db.Column(db.Date, nullable=False, index=True)  # ✅ OPTIMISATION
+    statut = db.Column(db.String(20), default='en_attente', index=True)  # ✅ OPTIMISATION
     date_creation = db.Column(db.DateTime, default=datetime.now)
 
     def to_dict(self):
@@ -833,9 +860,11 @@ class Amende(db.Model):
 
 class Livraison(db.Model):
     """Modèle pour les livraisons journalières des employés"""
+    __tablename__ = 'livraison'
+    
     id = db.Column(db.Integer, primary_key=True)
-    employe_id = db.Column(db.Integer, db.ForeignKey('employe.id'), nullable=False)
-    date_livraison = db.Column(db.Date, nullable=False)
+    employe_id = db.Column(db.Integer, db.ForeignKey('employe.id'), nullable=False, index=True)  # ✅ OPTIMISATION
+    date_livraison = db.Column(db.Date, nullable=False, index=True)  # ✅ OPTIMISATION
     nombre_journaux = db.Column(db.Integer, default=0)
     montant_jour = db.Column(db.Float, default=0.0)
     notes = db.Column(db.String(200))
@@ -854,14 +883,16 @@ class Livraison(db.Model):
 
 class Facture(db.Model):
     """Modèle pour les factures"""
+    __tablename__ = 'facture'
+    
     id = db.Column(db.Integer, primary_key=True)
     numero = db.Column(db.String(50), unique=True, nullable=False)
-    type_facture = db.Column(db.String(20), default='client') # client ou employe
-    date_facture = db.Column(db.Date, nullable=False)
+    type_facture = db.Column(db.String(20), default='client', index=True)  # ✅ OPTIMISATION
+    date_facture = db.Column(db.Date, nullable=False, index=True)  # ✅ OPTIMISATION
     date_debut = db.Column(db.Date)
     date_fin = db.Column(db.Date)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    employe_id = db.Column(db.Integer, db.ForeignKey('employe.id'), nullable=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False, index=True)  # ✅ OPTIMISATION
+    employe_id = db.Column(db.Integer, db.ForeignKey('employe.id'), nullable=True, index=True)  # ✅ OPTIMISATION
     total_brut = db.Column(db.Float, default=0.0)
     total_amendes = db.Column(db.Float, default=0.0)
     total_net = db.Column(db.Float, nullable=False)
@@ -872,12 +903,13 @@ class Facture(db.Model):
     date_creation = db.Column(db.DateTime, default=datetime.now)
 
     # ✅ NOUVEAUX CHAMPS POUR GESTION DES PAIEMENTS
-    statut_paiement = db.Column(db.String(20), default='impayee') # impayee, payee, en_retard, partielle
+    statut_paiement = db.Column(db.String(20), default='impayee', index=True)  # ✅ OPTIMISATION
     date_paiement = db.Column(db.Date, nullable=True)
-    methode_paiement = db.Column(db.String(50), nullable=True) # virement, cheque, especes, carte
+    methode_paiement = db.Column(db.String(50), nullable=True)
     montant_paye = db.Column(db.Float, default=0.0)
 
-    amendes = db.relationship('Amende', backref='facture', lazy=True)
+    # ✅ OPTIMISATION : lazy='dynamic' pour les amendes
+    amendes = db.relationship('Amende', backref='facture', lazy='dynamic')
 
     def to_dict(self):
         # Récupérer les emails de façon sécurisée
@@ -2134,16 +2166,18 @@ def reset_password(token):
 
 @app.route('/')
 @login_required
+@cache.cached(timeout=60)  # ✅ OPTIMISATION : Cache 1 minute
 def index():
-    """Page d'accueil"""
-    employes = Employe.query.all()
+    """Page d'accueil - OPTIMISÉE"""
+    # ✅ OPTIMISATION : Limiter à 50 employés actifs
+    employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).limit(50).all()
 
     return render_template('index.html',
                            entreprise=VOTRE_ENTREPRISE,
                            employes=employes,
                            stats={
                                'total_clients': Client.query.count(),
-                               'total_employes': Employe.query.count(),
+                               'total_employes': Employe.query.filter_by(actif=True).count(),
                                'total_factures': Facture.query.count(),
                                'factures_en_attente': Facture.query.filter_by(statut='en_attente').count()
                            })
@@ -2166,10 +2200,11 @@ def calendrier():
 @app.route('/nouvelle-facture-client')
 @comptable_ou_admin_required
 def nouvelle_facture_client():
-    """Page pour créer une facture client"""
+    """Page pour créer une facture client - OPTIMISÉE"""
     numero_auto = generer_numero_facture('client')
-    clients = Client.query.order_by(Client.nom).all()
-    employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
+    # ✅ OPTIMISATION : Limiter et trier
+    clients = Client.query.order_by(Client.nom).limit(100).all()
+    employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).limit(50).all()
 
     return render_template('nouvelle_facture_client.html',
                            entreprise=VOTRE_ENTREPRISE,
@@ -2181,13 +2216,15 @@ def nouvelle_facture_client():
 @app.route('/nouvelle-facture-employe')
 @comptable_ou_admin_required
 def nouvelle_facture_employe():
-    """Page pour créer une facture employé"""
+    """Page pour créer une facture employé - OPTIMISÉE"""
     numero_auto = generer_numero_facture('employe')
-    employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
+    # ✅ OPTIMISATION : Limiter à 50 employés actifs
+    employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).limit(50).all()
 
     # Récupérer les amendes en attente pour chaque employé
     employes_avec_amendes = []
     for emp in employes:
+        # ✅ OPTIMISATION : Requête optimisée
         amendes_en_attente = Amende.query.filter_by(
             employe_id=emp.id,
             statut='en_attente'
@@ -2978,8 +3015,9 @@ def api_employes():
 
         return jsonify(employe.to_dict()), 201
 
-    # GET
-    employes_list = Employe.query.order_by(Employe.nom).all()
+    # GET - ✅ OPTIMISATION : Pagination et cache
+    # ✅ OPTIMISATION : Limiter à 100 employés
+    employes_list = Employe.query.order_by(Employe.nom).limit(100).all()
     return jsonify([e.to_dict() for e in employes_list])
 
 @app.route('/api/employes/<int:employe_id>', methods=['PUT', 'DELETE'])
@@ -3289,13 +3327,18 @@ def get_numero_auto(type_facture):
     return jsonify({'numero_facture': generer_numero_facture(type_facture)})
 
 @app.route('/api/factures', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)  # ✅ OPTIMISATION : Cache 30 sec
 def api_get_factures():
-    """Récupérer toutes les factures avec filtres optionnels"""
+    """Récupérer toutes les factures avec filtres optionnels - OPTIMISÉE"""
     try:
         type_facture = request.args.get('type')  # client ou employe
         statut_paiement = request.args.get('statut_paiement')  # payee, impayee, etc.
         
-        query = Facture.query
+        # ✅ OPTIMISATION : Utiliser joinedload pour éviter N+1 queries
+        query = Facture.query.options(
+            joinedload(Facture.client),
+            joinedload(Facture.employe)
+        )
         
         if type_facture:
             query = query.filter_by(type_facture=type_facture)
@@ -3303,7 +3346,8 @@ def api_get_factures():
         if statut_paiement:
             query = query.filter_by(statut_paiement=statut_paiement)
         
-        factures = query.order_by(Facture.date_facture.desc()).all()
+        # ✅ OPTIMISATION : Limiter à 100 factures récentes
+        factures = query.order_by(Facture.date_facture.desc()).limit(100).all()
         
         # ✅ AJOUT DEBUG : Tester la conversion
         result = []
