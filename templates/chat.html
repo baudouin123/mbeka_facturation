@@ -15,15 +15,43 @@
             box-sizing: border-box;
         }
 
+        /* --- STYLES DES BARRES DE DÉFILEMENT (SCROLLBARS) --- */
+        /* Fonctionne sur Chrome, Edge, Safari */
+        ::-webkit-scrollbar {
+            width: 8px; /* Largeur verticale */
+            height: 8px; /* Hauteur horizontale */
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05); 
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #bdc3c7; 
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #95a5a6; 
+        }
+
+        /* Pour Firefox (support limité) */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #bdc3c7 rgba(0, 0, 0, 0.05);
+        }
+
         .chat-container {
             display: grid;
             grid-template-columns: 350px 1fr;
             gap: 0;
-            height: calc(100vh - 200px);
+            height: calc(100vh - 140px); /* Ajusté pour bien remplir l'écran */
             background: var(--bg-card);
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 15px var(--shadow);
+            margin-top: 20px;
         }
         
         /* Sidebar */
@@ -32,6 +60,7 @@
             display: flex;
             flex-direction: column;
             background: var(--bg-card);
+            height: 100%; /* Force la hauteur */
         }
         
         .sidebar-header {
@@ -39,6 +68,7 @@
             border-bottom: 2px solid var(--border-color);
             background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%);
             color: white;
+            flex-shrink: 0; /* Ne pas rétrécir */
         }
         
         .sidebar-header h3 {
@@ -86,7 +116,8 @@
         
         .conversations-list {
             flex: 1;
-            overflow-y: auto;
+            overflow-y: auto; /* Active le scroll vertical */
+            height: 100%;
         }
         
         .conversation-item {
@@ -155,6 +186,8 @@
             display: flex;
             flex-direction: column;
             background: var(--bg-primary);
+            height: 100%;
+            overflow: hidden; /* Empêche le débordement global */
         }
         
         .chat-header {
@@ -164,6 +197,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
         }
         
         .chat-header-info {
@@ -186,8 +220,9 @@
         
         .chat-messages {
             flex: 1;
-            overflow-y: auto;
+            overflow-y: auto; /* Active le scroll vertical des messages */
             padding: 20px;
+            scroll-behavior: smooth;
         }
         
         .message {
@@ -241,24 +276,6 @@
             word-wrap: break-word;
         }
 
-        .message-file {
-            padding: 10px 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .message-file i {
-            font-size: 24px;
-        }
-
-        .message-file img {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        
         .message-time {
             font-size: 11px;
             margin-top: 4px;
@@ -278,6 +295,7 @@
             padding: 20px;
             border-top: 2px solid var(--border-color);
             background: var(--bg-card);
+            flex-shrink: 0;
         }
         
         .chat-input-container {
@@ -321,6 +339,7 @@
             resize: none;
             max-height: 120px;
             font-family: inherit;
+            overflow-y: auto; /* Scroll dans l'input si texte très long */
         }
         
         .chat-input:focus {
@@ -343,12 +362,6 @@
         .btn-send:hover {
             transform: scale(1.1);
             box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
-        }
-        
-        .btn-send:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
         }
         
         /* Empty state */
@@ -383,11 +396,14 @@
 
         .modal-content {
             background: var(--bg-card);
-            margin: 10% auto;
+            margin: 5% auto; /* Un peu plus haut */
             padding: 0;
             border-radius: 12px;
             width: 90%;
             max-width: 500px;
+            max-height: 90vh; /* Max hauteur */
+            display: flex;
+            flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
             animation: slideDown 0.3s;
         }
@@ -406,6 +422,7 @@
             background: linear-gradient(135deg, #3498DB, #2980B9);
             color: white;
             border-radius: 12px 12px 0 0;
+            flex-shrink: 0;
         }
 
         .modal-header h3 {
@@ -426,6 +443,7 @@
 
         .modal-body {
             padding: 30px;
+            overflow-y: auto; /* Scroll si le contenu est trop grand */
         }
 
         .form-control {
@@ -445,6 +463,7 @@
             display: flex;
             gap: 10px;
             justify-content: flex-end;
+            flex-shrink: 0;
         }
 
         .btn-primary, .btn-secondary {
@@ -494,10 +513,10 @@
             display: block;
         }
 
-        /* === NOUVEAU CSS POUR LA LISTE DE GROUPE === */
+        /* === LISTE UTILISATEURS AVEC SCROLLBAR === */
         .user-checkbox-list {
             max-height: 250px;
-            overflow-y: auto;
+            overflow-y: auto; /* Active le scroll */
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 10px;
