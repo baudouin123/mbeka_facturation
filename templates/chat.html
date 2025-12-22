@@ -754,9 +754,9 @@
                 console.log('❌ Déconnecté du serveur chat');
             });
             
-            // --- GESTION DES MESSAGES AMÉLIORÉE (CORRECTIF LAG) ---
+            // --- GESTION DES MESSAGES AMÉLIORÉE (CORRECTIF LAG + HEURE) ---
             socket.on('new_message', function(message) {
-                // Si c'est MON message, on ignore (car déjà affiché localement)
+                // Si c'est MON message, on ignore (car déjà affiché localement pour la vitesse)
                 if (message.user_id === currentUserId) return;
 
                 console.log('📨 Nouveau message reçu:', message);
@@ -888,6 +888,22 @@
             }
         }
         
+        // --- NOUVELLE FONCTION POUR CORRIGER L'HEURE ---
+        function getLocalTimeFromServer(dateString) {
+            if (!dateString) return '';
+            // Le serveur envoie "YYYY-MM-DD HH:MM:SS" qui est en UTC
+            // On le convertit en format ISO pour que JS comprenne que c'est du UTC
+            try {
+                // On remplace l'espace par T et on ajoute Z à la fin (ISO 8601 UTC)
+                const utcDate = new Date(dateString.replace(' ', 'T') + 'Z');
+                if (isNaN(utcDate.getTime())) return dateString; // Si échec, on garde l'original
+                
+                return utcDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return dateString;
+            }
+        }
+
         function afficherMessage(message) {
             const messagesContainer = document.getElementById('chatMessages');
             const isOwn = message.user_id === currentUserId;
@@ -895,9 +911,17 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isOwn ? 'own' : ''}`;
             
-            // Gestion nom/avatar temporaire si pas encore confirmé par serveur
             const nomComplet = message.nom_complet || (message.username || 'Moi');
             const initial = nomComplet[0].toUpperCase();
+            
+            // CALCUL DE L'HEURE LOCALE
+            let displayTime = message.created_at_format; // Valeur par défaut
+            
+            // Si le message vient du serveur (il a un champ created_at complet type string)
+            // Et ce n'est pas notre message temporaire local
+            if (message.created_at && typeof message.created_at === 'string' && message.created_at.includes('-')) {
+                displayTime = getLocalTimeFromServer(message.created_at);
+            }
             
             messageDiv.innerHTML = `
                 <div class="message-avatar">${initial}</div>
@@ -906,7 +930,7 @@
                         ${escapeHtml(message.contenu)}
                     </div>
                     <div class="message-time">
-                        ${message.created_at_format} ${isOwn ? '✓' : ''}
+                        ${displayTime} ${isOwn ? (message.lu ? '✓✓' : '✓') : ''}
                     </div>
                 </div>
             `;
@@ -958,6 +982,7 @@
             
             // 1. Afficher immédiatement (Optimistic UI)
             const now = new Date();
+            // Ici c'est déjà l'heure locale, donc pas besoin de conversion
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             const tempMessage = {
@@ -965,8 +990,9 @@
                 username: 'Moi',
                 conversation_id: currentConversationId,
                 contenu: contenu,
-                created_at_format: timeString,
-                lu: false
+                created_at_format: timeString, // On force l'heure locale directe
+                lu: false,
+                is_temp: true // Marqueur pour ne pas re-convertir
             };
             
             afficherMessage(tempMessage);
