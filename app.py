@@ -2568,6 +2568,66 @@ def handle_typing(data):
         'is_typing': is_typing
     }, room=room, include_self=False)
 
+    # --- AJOUTER À LA FIN DE app.py OU AVEC LES AUTRES ROUTES API CHAT ---
+
+@app.route('/api/chat/messages/<int:message_id>', methods=['DELETE'])
+@login_required
+def supprimer_message(message_id):
+    msg = Message.query.get_or_404(message_id)
+    # Vérifier que c'est bien l'auteur qui supprime
+    if msg.expediteur_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Non autorisé'}), 403
+    
+    db.session.delete(msg)
+    db.session.commit()
+    
+    # Notifier via SocketIO pour que le message disparaisse chez tout le monde
+    socketio.emit('message_deleted', {'message_id': message_id, 'conversation_id': msg.conversation_id})
+    return jsonify({'success': True})
+
+@app.route('/api/chat/groupes/<int:groupe_id>/modifier', methods=['POST'])
+@login_required
+def modifier_groupe(groupe_id):
+    data = request.json
+    groupe = Conversation.query.get_or_404(groupe_id)
+    
+    # Vérifier que l'utilisateur est membre
+    participant = Participant.query.filter_by(conversation_id=groupe.id, utilisateur_id=current_user.id).first()
+    if not participant:
+        return jsonify({'success': False, 'error': 'Non autorisé'}), 403
+        
+    if 'nom' in data:
+        groupe.nom = data['nom']
+        
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/chat/groupes/<int:groupe_id>/membres/<int:user_id>', methods=['DELETE'])
+@login_required
+def retirer_membre_groupe(groupe_id, user_id):
+    # Logique simplifiée : n'importe quel membre peut en retirer un autre (à sécuriser si besoin)
+    Participant.query.filter_by(conversation_id=groupe_id, utilisateur_id=user_id).delete()
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/chat/groupes/<int:groupe_id>/info', methods=['GET'])
+@login_required
+def info_groupe(groupe_id):
+    groupe = Conversation.query.get_or_404(groupe_id)
+    participants = db.session.query(Utilisateur).join(Participant).filter(Participant.conversation_id == groupe.id).all()
+    
+    membres_json = [{
+        'id': u.id,
+        'nom_complet': f"{u.prenom} {u.nom}",
+        'username': u.username
+    } for u in participants]
+    
+    return jsonify({
+        'success': True,
+        'nom': groupe.nom,
+        'membres': membres_json
+    })
+
 # ============================================================================
 # ROUTES POUR GÉNÉRER LES FACTURES
 # ============================================================================
