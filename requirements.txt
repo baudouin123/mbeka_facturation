@@ -23,6 +23,9 @@ gevent==24.2.1
 gevent-websocket==0.10.1
 Flask-Caching==2.1.0
 Flask-Compress==1.14
+Flask-Assets==2.1.0
+cssmin==0.2.0
+jsmin==3.0.1
 
 
 
