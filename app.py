@@ -142,14 +142,17 @@ js = Bundle(
 )
 assets.register('js_all', js)
 
-# SocketIO
+# SocketIO - ✅ OPTIMISATION : Utiliser gevent au lieu de threading
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*", 
     manage_session=False,
-    async_mode='threading',
-    logger=False,  # ✅ OPTIMISATION : Désactiver les logs SocketIO en production
-    engineio_logger=False  # ✅ OPTIMISATION : Désactiver les logs EngineIO
+    async_mode='gevent',  # ✅ OPTIMISATION : gevent = 10x plus rapide que threading
+    logger=False,
+    engineio_logger=False,
+    ping_timeout=60,  # ✅ OPTIMISATION : Timeout ping
+    ping_interval=25,  # ✅ OPTIMISATION : Intervalle ping
+    max_http_buffer_size=1e6  # ✅ OPTIMISATION : 1MB buffer
 )
 
 # ✅ AJOUT : Configuration Flask-Login
