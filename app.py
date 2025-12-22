@@ -36,6 +36,28 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from datetime import datetime
 from sqlalchemy import and_, or_
+from flask_caching import Cache
+from flask_compress import Compress
+Compress(app)
+from flask_assets import Environment, Bundle
+assets = Environment(app)
+
+
+# Bundle CSS
+css = Bundle(
+    'style.css',
+    filters='cssmin',
+    output='gen/packed.css'
+)
+assets.register('css_all', css)
+
+# Bundle JS
+js = Bundle(
+    'dark-mode.js',
+    filters='jsmin',
+    output='gen/packed.js'
+)
+assets.register('js_all', js)
 
 def parse_date(value):
     """Essaye plusieurs formats de date automatiquement."""
@@ -51,7 +73,10 @@ Image.MAX_IMAGE_PIXELS = None
 
 app = Flask(__name__)
 app.config['WTF_CSRF_CHECK_DEFAULT'] = False
-
+cache = Cache(app, config={
+    'CACHE_TYPE': 'SimpleCache',
+    'CACHE_DEFAULT_TIMEOUT': 300  # 5 minutes
+})
 # ✅ AJOUT : Clé secrète pour la sécurité
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mbeka-facturation-secure-key-2024-december-14')
 
@@ -735,7 +760,7 @@ class Client(db.Model):
     siret = db.Column(db.String(20))
     numero_tva = db.Column(db.String(50))  # ← NOUVELLE LIGNE
     date_creation = db.Column(db.DateTime, default=datetime.now)
-    factures = db.relationship('Facture', backref='client', lazy=True)
+    factures = db.relationship('Facture', backref='client', lazy='dynamic')
 
     def to_dict(self):
         return {
@@ -763,7 +788,7 @@ class Employe(db.Model):
     actif = db.Column(db.Boolean, default=True)
     date_creation = db.Column(db.DateTime, default=datetime.now)
     amendes = db.relationship('Amende', backref='employe', lazy=True)
-    livraisons = db.relationship('Livraison', backref='employe', lazy=True)
+    livraisons = db.relationship('Livraison', backref='employe', lazy='dynamic')
     factures = db.relationship('Facture', backref='employe', lazy=True, foreign_keys='Facture.employe_id')
 
     def nom_complet(self):
@@ -973,7 +998,7 @@ class Conversation(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relations
-    messages = db.relationship('Message', backref='conversation', lazy=True, cascade='all, delete-orphan')
+    messages = db.relationship('Message', backref='conversation', lazy='dynamic', cascade='all, delete-orphan')
     participants = db.relationship('ConversationParticipant', backref='conversation', lazy=True, cascade='all, delete-orphan')
     
     def __repr__(self):
@@ -2125,6 +2150,7 @@ def index():
 
 @app.route('/dashboard')
 @login_required
+@cache.cached(timeout=60)
 def dashboard():
     """Page du tableau de bord avec graphiques"""
     return render_template('dashboard.html',
