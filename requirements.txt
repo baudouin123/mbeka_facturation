@@ -21,6 +21,7 @@ flask-socketio==5.3.5
 python-socketio==5.10.0
 gevent==24.2.1
 gevent-websocket==0.10.1
+Flask-Caching==2.1.0
 
 
 
