@@ -2,7 +2,8 @@
 APPLICATION WEB DE FACTURATION MBEKA - AVEC GESTION DES AMENDES
 Pour entreprises sous-traitantes avec gestion des amendes par employé
 """
-
+from gevent import monkey
+monkey.patch_all()
 from flask import Flask, render_template, request, send_file, jsonify, redirect, url_for, session, flash
 from flask_wtf.csrf import CSRFProtect
 from flask_sqlalchemy import SQLAlchemy
