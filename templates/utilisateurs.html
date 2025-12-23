@@ -560,16 +560,96 @@
             } catch(e) { alert("Erreur serveur"); }
         }
 
-        async function supprimerUtilisateur(id, nom) {
-            if(confirm(`Supprimer ${nom} ?`)) {
+                async function supprimerUtilisateur(id, nom) {
+            if(!confirm(`⚠️ Êtes-vous sûr de vouloir supprimer ${nom} ?
+
+Cette action est irréversible.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/utilisateurs/${id}/supprimer`, { 
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    alert('✅ Utilisateur supprimé avec succès !');
+                    location.reload();
+                } else {
+                    alert('❌ Erreur : ' + (data.error || 'Impossible de supprimer cet utilisateur'));
+                    console.error('Erreur de suppression:', data);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion : ' + error.message);
+                console.error('Erreur:', error);
+            }
+        } ?`)) {
                 await fetch(`/api/utilisateurs/${id}/supprimer`, { method: 'DELETE' });
                 location.reload();
             }
         }
 
-        async function genererLienReset(id, nom) {
-            if(confirm(`Générer lien pour ${nom} ?`)) {
-                const res = await fetch(`/api/utilisateurs/${id}/generer-lien-reset`, { method: 'POST' });
+                async function genererLienReset(id, nom, email) {
+            if(!confirm(`📧 Générer et envoyer un lien de réinitialisation à ${nom} ?
+
+Email : ${email || 'Non renseigné'}`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/utilisateurs/${id}/generer-lien-reset`, { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        send_email: true
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if(data.success) {
+                    let messageHTML = '';
+                    
+                    if(data.email_sent) {
+                        messageHTML = `
+                            <div style="color: #27ae60; font-weight: bold; margin-bottom: 15px;">
+                                ✅ Email envoyé avec succès à ${email} !
+                            </div>
+                            <p>L'utilisateur va recevoir un email avec le lien de réinitialisation.</p>
+                        `;
+                    } else {
+                        messageHTML = `
+                            <div style="color: #e67e22; font-weight: bold; margin-bottom: 15px;">
+                                ⚠️ ${data.email_message || 'Email non envoyé'}
+                            </div>
+                            <p><strong>Lien à copier manuellement :</strong></p>
+                            <input type="text" value="${data.reset_link}" 
+                                   onclick="this.select()" readonly 
+                                   style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+                            <button onclick="navigator.clipboard.writeText('${data.reset_link}'); alert('Lien copié !')" 
+                                    style="background: #3498DB; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer;">
+                                📋 Copier le lien
+                            </button>
+                        `;
+                    }
+                    
+                    document.getElementById('reset-info').innerHTML = messageHTML;
+                    document.getElementById('modalReset').style.display = 'block';
+                } else {
+                    alert('❌ Erreur : ' + (data.error || 'Impossible de générer le lien'));
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion : ' + error.message);
+                console.error('Erreur:', error);
+            }
+        });
                 const data = await res.json();
                 if(data.success) {
                     document.getElementById('reset-info').innerHTML = `
