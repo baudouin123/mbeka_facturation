@@ -3221,14 +3221,15 @@ def clients():
     """Page de gestion des clients"""
     clients_list = Client.query.order_by(Client.nom).all()
 
-    # Calculer les statistiques
+    # ✅ CORRECTION : Utiliser .count() et .all() avec lazy='dynamic'
     total_clients = len(clients_list)
-    total_factures = sum(len(client.factures) for client in clients_list)
-    total_ca = sum(sum(f.total_net for f in client.factures) for client in clients_list)
+    total_factures = sum(client.factures.count() for client in clients_list)  # ← .count()
+    total_ca = sum(sum(f.total_net for f in client.factures.all()) for client in clients_list)  # ← .all()
 
     return render_template('clients.html',
                            clients=clients_list,
                            entreprise=VOTRE_ENTREPRISE,
+                           now=datetime.now(),  # ✅ AJOUTÉ pour éviter erreur dans template
                            stats={
                                'total_clients': total_clients,
                                'total_factures': total_factures,
@@ -3767,8 +3768,9 @@ def saisie_journaliere():
     employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
     return render_template('saisie_journaliere.html',
                          entreprise=VOTRE_ENTREPRISE,
-                         employes=employes)
-
+                         employes=employes,
+                        now=datetime.now())
+    
 @app.route('/api/livraisons', methods=['GET', 'POST'])
 def api_livraisons():
     """API pour gérer les livraisons"""
