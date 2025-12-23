@@ -3761,6 +3761,7 @@ def supprimer_facture(facture_id):
 # ============================================================================
 
 @app.route('/saisie-journaliere')
+@login_required
 def saisie_journaliere():
     """Page de saisie des livraisons journalières"""
     employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
