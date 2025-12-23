@@ -254,7 +254,7 @@
                                 <td>{{ user.derniere_connexion.strftime('%d/%m/%Y %H:%M') if user.derniere_connexion else 'Jamais' }}</td>
                                 <td>
                                     <button class="btn-action btn-edit" onclick="modifierUtilisateur({{ user.id }})"><i class="fas fa-edit"></i></button>
-                                    <button class="btn-action" style="background: #f39c12;" onclick="genererLienReset({{ user.id }}, '{{ user.username }}')"><i class="fas fa-key"></i></button>
+                                    <button class="btn-action" style="background: #f39c12;" onclick="genererLienReset({{ user.id }}, '{{ user.username }}', '{{ user.email or '' }}')"><i class="fas fa-key"></i></button>
                                     {% if user.id != current_user.id %}
                                     <button class="btn-action btn-delete" onclick="supprimerUtilisateur({{ user.id }}, '{{ user.username }}')"><i class="fas fa-trash"></i></button>
                                     {% endif %}
