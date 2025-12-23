@@ -109,7 +109,7 @@
                                 </td>
                                 <td>{{ client.siret }}</td>
                                 <td>
-                                    <span class="badge badge-info">{{ client.factures|length }} factures</span>
+                                    <span class="badge badge-info">{{ client.factures.count() }} factures</span>
                                 </td>
                                 <td>
                                     <div class="action-buttons">
@@ -119,7 +119,7 @@
                                         </button>
                                         
                                         <button class="btn-action btn-danger" title="Supprimer" 
-                                                onclick="supprimerClient({{ client.id }}, '{{ client.nom }}', {{ client.factures|length }})">
+                                                onclick="supprimerClient({{ client.id }}, '{{ client.nom }}', {{ client.factures.count() }})">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -323,8 +323,3 @@
     <script src="{{ url_for('static', filename='dark-mode.js') }}"></script>
 </body>
 </html>
-
-
-
-
-
