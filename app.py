@@ -2033,13 +2033,6 @@ def api_supprimer_utilisateur(user_id):
         db.session.delete(user)
         db.session.commit()
 
-        # Log de l'action
-        log_action(
-            utilisateur_id=current_user.id,
-            action='suppression_utilisateur',
-            details=f"Suppression de l'utilisateur {user.username}"
-        )
-
         return jsonify({
             'success': True,
             'message': 'Utilisateur supprimé avec succès'
