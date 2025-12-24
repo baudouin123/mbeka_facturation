@@ -89,18 +89,20 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 20,  # ✅ OPTIMISATION : Connexions supplémentaires
 }
 
-# ✅ AJOUT : Configuration Email (Gmail) - Pour factures
-app.config['MAIL_SERVER'] = 'mail.grandit.net'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
+# ✅ AJOUT : Configuration Email (Gandi.net) - Pour factures
+app.config['MAIL_SERVER'] = 'smtp.gandi.net'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USERNAME'] = 'facturation@mbekafacturation.be'
 app.config['MAIL_PASSWORD'] = 'YannickSimba123@'
 app.config['MAIL_DEFAULT_SENDER'] = 'facturation@mbekafacturation.be'
 
-# ✅ Configuration Email Reset Mot de Passe (Grandit.net)
-app.config['RESET_MAIL_SERVER'] = 'mail.grandit.net'
-app.config['RESET_MAIL_PORT'] = 587
-app.config['RESET_MAIL_USE_TLS'] = True
+# ✅ Configuration Email Reset Mot de Passe (Gandi.net)
+app.config['RESET_MAIL_SERVER'] = 'smtp.gandi.net'
+app.config['RESET_MAIL_PORT'] = 465
+app.config['RESET_MAIL_USE_SSL'] = True
+app.config['RESET_MAIL_USE_TLS'] = False
 app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
 app.config['RESET_MAIL_PASSWORD'] = 'YannickSimba123@'
 app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
@@ -529,9 +531,8 @@ def send_email(to_email, subject, body):
         html_part = MIMEText(body, 'html')
         msg.attach(html_part)
 
-        # Connexion au serveur SMTP
-        server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
-        server.starttls()
+        # Connexion au serveur SMTP Gandi avec SSL (port 465)
+        server = smtplib.SMTP_SSL(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
 
         # Envoyer l'email
@@ -574,9 +575,8 @@ def send_reset_password_email(to_email, subject, body):
         html_part = MIMEText(body, 'html')
         msg.attach(html_part)
         
-        # Connexion au serveur SMTP Grandit
-        server = smtplib.SMTP(app.config['RESET_MAIL_SERVER'], app.config['RESET_MAIL_PORT'])
-        server.starttls()
+        # Connexion au serveur SMTP Gandi avec SSL (port 465)
+        server = smtplib.SMTP_SSL(app.config['RESET_MAIL_SERVER'], app.config['RESET_MAIL_PORT'])
         server.login(app.config['RESET_MAIL_USERNAME'], app.config['RESET_MAIL_PASSWORD'])
         
         # Envoyer l'email
@@ -802,9 +802,8 @@ def send_facture_email(facture, pdf_path):
         except Exception as e:
             return False, f"Erreur lors de la lecture du PDF: {str(e)}"
 
-        # Connexion au serveur SMTP et envoi
-        server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
-        server.starttls()
+        # Connexion au serveur SMTP Gandi avec SSL et envoi
+        server = smtplib.SMTP_SSL(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
         server.send_message(msg)
         server.quit()
