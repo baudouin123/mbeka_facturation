@@ -104,7 +104,7 @@ app.config['RESET_MAIL_PORT'] = 465
 app.config['RESET_MAIL_USE_SSL'] = True
 app.config['RESET_MAIL_USE_TLS'] = False
 app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
-app.config['RESET_MAIL_PASSWORD'] = 'YannickSimba123@'
+app.config['RESET_MAIL_PASSWORD'] = 'factureSIM123@'
 app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
 
 # ✅ AJOUT : Configuration des sessions
