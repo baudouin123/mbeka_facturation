@@ -745,7 +745,6 @@ def send_facture_email(facture, pdf_path):
         # Ajouter le PDF en pièce jointe
         try:
             # ✅ DEBUG : Vérifier que le fichier existe et sa taille
-            import os
             if not os.path.exists(pdf_path):
                 return False, f"Le fichier PDF n'existe pas : {pdf_path}"
 
