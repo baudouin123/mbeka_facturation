@@ -578,6 +578,7 @@ def send_email(to_email, subject, body, email_type='facturation'):
 def send_facture_email(facture, pdf_path):
     """
     Envoie une facture par email avec le PDF en pièce jointe
+    ✅ VERSION CORRIGÉE : Utilise le compte FACTURATION (facturation@mbekafacturation.be)
 
     Args:
         facture: Objet Facture de la BDD
@@ -587,27 +588,26 @@ def send_facture_email(facture, pdf_path):
         tuple: (success: bool, message: str)
     """
     try:
-        # Vérifier que la configuration email est faite
-        if app.config['MAIL_USERNAME'] == 'votre.email@gmail.com':
-            return False, "Configuration email non faite. Voir app.py ligne 48-51"
-
         # Déterminer le destinataire
         if facture.type_facture == 'client':
             if not facture.client or not facture.client.email:
                 return False, "Le client n'a pas d'adresse email configurée"
             to_email = facture.client.email
             destinataire_nom = facture.client.nom
-        else: # employe
+        else:  # employe
             if not facture.employe or not facture.employe.email:
                 return False, "L'employé n'a pas d'adresse email configurée"
             to_email = facture.employe.email
             destinataire_nom = f"{facture.employe.prenom} {facture.employe.nom}"
 
-        # Créer le message
-        msg = MIMEMultipart()
-        msg['From'] = app.config['MAIL_DEFAULT_SENDER']
-        msg['To'] = to_email
-        msg['Subject'] = f"Facture {facture.numero} - {VOTRE_ENTREPRISE['nom']}"
+        # ✅ CORRECTION : Utiliser le compte FACTURATION
+        username = app.config['MAIL_USERNAME']
+        password = app.config['MAIL_PASSWORD']
+        sender_name, sender_email = app.config['MAIL_DEFAULT_SENDER']
+
+        # Logs pour debug (en production seulement)
+        if os.environ.get('DATABASE_URL'):
+            print(f"📧 Envoi facture: {sender_email} → {to_email}")
 
         # Corps de l'email en HTML
         email_body = f"""
@@ -674,15 +674,6 @@ def send_facture_email(facture, pdf_path):
                 .footer p {{
                     margin: 5px 0;
                 }}
-                .btn-download {{
-                    display: inline-block;
-                    background: #667eea;
-                    color: white;
-                    padding: 12px 30px;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    margin: 20px 0;
-                }}
             </style>
         </head>
         <body>
@@ -742,8 +733,14 @@ def send_facture_email(facture, pdf_path):
         </html>
         """
 
+        # Créer le message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"Facture {facture.numero} - {VOTRE_ENTREPRISE['nom']}"
+        msg['From'] = f"{sender_name} <{sender_email}>"
+        msg['To'] = to_email
+
         # Ajouter le corps HTML
-        msg.attach(MIMEText(email_body, 'html'))
+        msg.attach(MIMEText(email_body, 'html', 'utf-8'))
 
         # Ajouter le PDF en pièce jointe
         try:
@@ -785,12 +782,15 @@ def send_facture_email(facture, pdf_path):
         except Exception as e:
             return False, f"Erreur lors de la lecture du PDF: {str(e)}"
 
-        # Connexion au serveur SMTP et envoi
+        # ✅ CONNEXION AU SERVEUR SMTP GRANDIT.NET
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
-        server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
+        server.login(username, password)
         server.send_message(msg)
         server.quit()
+
+        if os.environ.get('DATABASE_URL'):
+            print(f"✅ Facture envoyée avec succès à {to_email}")
 
         return True, f"Facture envoyée avec succès à {to_email}"
 
