@@ -90,22 +90,24 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # ✅ AJOUT : Configuration Email (Gandi.net) - Pour factures
-app.config['MAIL_SERVER'] = 'smtp.gandi.net'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USE_TLS'] = False
-app.config['MAIL_USERNAME'] = 'facturation@mbekafacturation.be'
-app.config['MAIL_PASSWORD'] = 'YannickSimba123@'
+app.config['MAIL_SERVER'] = 'mail.gandi.net'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = 'facturation@mbekafacturation.be'
 
+
 # ✅ Configuration Email Reset Mot de Passe (Gandi.net)
-app.config['RESET_MAIL_SERVER'] = 'smtp.gandi.net'
-app.config['RESET_MAIL_PORT'] = 465
-app.config['RESET_MAIL_USE_SSL'] = True
-app.config['RESET_MAIL_USE_TLS'] = False
-app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
-app.config['RESET_MAIL_PASSWORD'] = 'factureSIM123@'
+app.config['RESET_MAIL_SERVER'] = 'mail.gandi.net'
+app.config['RESET_MAIL_PORT'] = 587
+app.config['RESET_MAIL_USE_TLS'] = True
+app.config['RESET_MAIL_USE_SSL'] = False
+app.config['RESET_MAIL_USERNAME'] = os.environ.get('RESET_MAIL_USERNAME')
+app.config['RESET_MAIL_PASSWORD'] = os.environ.get('RESET_MAIL_PASSWORD')
 app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
+
 
 # ✅ AJOUT : Configuration des sessions
 app.config['SESSION_TYPE'] = 'filesystem'
