@@ -102,7 +102,7 @@ app.config['RESET_MAIL_SERVER'] = 'mail.grandit.net'
 app.config['RESET_MAIL_PORT'] = 587
 app.config['RESET_MAIL_USE_TLS'] = True
 app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
-app.config['RESET_MAIL_PASSWORD'] = 'VOTRE_MOT_DE_PASSE_ICI'  # ⚠️ À REMPLIR
+app.config['RESET_MAIL_PASSWORD'] = 'YannickSimba123@'
 app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
 
 # ✅ AJOUT : Configuration des sessions
@@ -2111,83 +2111,65 @@ def generer_lien_reset(user_id):
         if not user:
             return jsonify({'error': 'Utilisateur introuvable'}), 404
 
+        if not user.email:
+            return jsonify({'error': 'Cet utilisateur n\'a pas d\'adresse email configurée'}), 400
+
         # Générer le token
         token = user.generate_reset_token()
         db.session.commit()
 
-        # Générer le lien (à adapter selon votre domaine)
-        reset_link = f"http://localhost:5000/reset-password/{token}"
+        # Générer le lien avec l'URL correcte (Render en production, localhost en dev)
+        if os.environ.get('RENDER'):
+            reset_link = f"https://mbeka-facturation.onrender.com/reset-password/{token}"
+        else:
+            reset_link = f"http://localhost:10000/reset-password/{token}"
 
-        # Vérifier si on doit envoyer l'email automatiquement
-        send_email_auto = request.json.get('send_email', False) if request.is_json else False
+        # Préparer l'email HTML
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2 style="color: #2C3E50;">Réinitialisation de mot de passe</h2>
+            <p>Bonjour <strong>{user.prenom or user.username}</strong>,</p>
+            <p>Un administrateur a généré un lien de réinitialisation de mot de passe pour votre compte.</p>
+            <p>Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
+            <p style="margin: 30px 0;">
+                <a href="{reset_link}"
+                   style="background: #3498DB; color: white; padding: 12px 30px;
+                          text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Réinitialiser mon mot de passe
+                </a>
+            </p>
+            <p><strong>Ce lien est valide pendant 24 heures.</strong></p>
+            <p style="color: #7f8c8d; font-size: 14px;">
+                Si vous n'avez pas demandé cette réinitialisation, contactez un administrateur.
+            </p>
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #ecf0f1;">
+            <p style="color: #95a5a6; font-size: 12px;">
+                L'équipe Mbeka Facturation
+            </p>
+        </body>
+        </html>
+        """
 
-        email_sent = False
-        email_message = ""
+        # Envoyer l'email via le compte motdepasseoublier@mbekafacturation.be
+        success, message = send_reset_password_email(
+            to_email=user.email,
+            subject="Réinitialisation de votre mot de passe - Mbeka",
+            body=email_body
+        )
 
-        if send_email_auto and user.email:
-            # Préparer l'email HTML
-            email_body = f"""
-            <html>
-            <body style="font-family: Arial, sans-serif; padding: 20px;">
-                <h2 style="color: #2C3E50;">Réinitialisation de mot de passe</h2>
-                <p>Bonjour <strong>{user.prenom or user.username}</strong>,</p>
-                <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
-                <p>Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
-                <p style="margin: 30px 0;">
-                    <a href="{reset_link}"
-                       style="background: #3498DB; color: white; padding: 12px 30px;
-                              text-decoration: none; border-radius: 5px; display: inline-block;">
-                        Réinitialiser mon mot de passe
-                    </a>
-                </p>
-                <p><strong>Ce lien est valide pendant 24 heures.</strong></p>
-                <p style="color: #7f8c8d; font-size: 14px;">
-                    Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
-                </p>
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #ecf0f1;">
-                <p style="color: #95a5a6; font-size: 12px;">
-                    L'équipe Mbeka Facturation
-                </p>
-            </body>
-            </html>
-            """
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Email de réinitialisation envoyé à {user.email}'
+            })
+        else:
+            return jsonify({
+                'error': f'Erreur lors de l\'envoi de l\'email: {message}'
+            }), 500
 
-            # Envoyer l'email
-            success, message = send_email(
-                to_email=user.email,
-                subject="Réinitialisation de votre mot de passe - Mbeka",
-                body=email_body
-            )
-
-            email_sent = success
-            email_message = message
-
-        # Préparer les messages pour copie manuelle
-        message_sms = f"Votre lien de réinitialisation Mbeka : {reset_link} (valide 24h)"
-        message_email_text = f"""
-Bonjour {user.prenom or user.username},
-
-Voici votre lien de réinitialisation de mot de passe :
-{reset_link}
-
-Ce lien est valide pendant 24 heures.
-
-Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
-
-Cordialement,
-L'équipe Mbeka
-"""
-
-        return jsonify({
-            'success': True,
-            'message': 'Lien de réinitialisation généré',
-            'reset_link': reset_link,
-            'message_sms': message_sms,
-            'message_email': message_email_text,
-            'user_email': user.email,
-            'user_telephone': user.telephone,
-            'expiry': user.reset_token_expiry.strftime('%d/%m/%Y %H:%M') if user.reset_token_expiry else None,
-            'email_sent': email_sent,
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
             'email_message': email_message
         })
 
