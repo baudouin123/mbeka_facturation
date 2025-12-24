@@ -2170,12 +2170,6 @@ def generer_lien_reset(user_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-            'email_message': email_message
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
