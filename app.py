@@ -3259,8 +3259,15 @@ def clients():
 
     # Calculer les statistiques
     total_clients = len(clients_list)
-    total_factures = sum(len(client.factures) for client in clients_list)
-    total_ca = sum(sum(f.total_net for f in client.factures) for client in clients_list)
+    
+    # FIX: Utiliser .count() au lieu de len() pour les relations SQLAlchemy
+    total_factures = sum(client.factures.count() for client in clients_list)
+    
+    # FIX: Charger explicitement les factures ou utiliser une requête optimisée
+    total_ca = 0
+    for client in clients_list:
+        for facture in client.factures:
+            total_ca += facture.total_net
 
     return render_template('clients.html',
                            clients=clients_list,
