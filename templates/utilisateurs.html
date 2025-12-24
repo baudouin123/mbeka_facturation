@@ -335,12 +335,12 @@
     </div>
 
     <div id="modalModifier" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
                 <h3><i class="fas fa-user-edit"></i> Modifier utilisateur</h3>
                 <button class="btn-close" onclick="fermerModalModifier()">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 20px; max-height: 60vh;">
                 <input type="hidden" id="edit-user-id">
                 <div class="form-group">
                     <label>Nom d'utilisateur</label>
@@ -361,6 +361,10 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label>Téléphone</label>
+                    <input type="text" id="edit-telephone" class="form-control">
+                </div>
+                <div class="form-group">
                     <label>Rôle</label>
                     <select id="edit-role" class="form-control">
                     </select>
@@ -374,8 +378,21 @@
                         <input type="checkbox" id="edit-actif"> Compte actif
                     </label>
                 </div>
+                
+                <!-- NOUVEAU: Bouton générer lien reset -->
+                <div class="form-group" style="border-top: 2px dashed #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                    <label style="display: block; margin-bottom: 10px;">
+                        <i class="fas fa-key"></i> Réinitialisation mot de passe
+                    </label>
+                    <button type="button" class="btn-secondary" onclick="genererLienReset()" style="width: 100%;">
+                        <i class="fas fa-envelope"></i> Générer et envoyer le lien de reset
+                    </button>
+                    <small style="display: block; margin-top: 8px; color: #7f8c8d;">
+                        Un email sera envoyé à l'utilisateur avec un lien pour réinitialiser son mot de passe
+                    </small>
+                </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex-shrink: 0; border-top: 1px solid #e0e0e0; background: white;">
                 <button class="btn-logout" style="background: #95a5a6;" onclick="fermerModalModifier()">Annuler</button>
                 <button class="btn-add" style="background: #3498DB;" onclick="sauvegarderModification()">Mettre à jour</button>
             </div>
@@ -532,6 +549,7 @@
                 document.getElementById('edit-email').value = user.email;
                 document.getElementById('edit-nom').value = user.nom || '';
                 document.getElementById('edit-prenom').value = user.prenom || '';
+                document.getElementById('edit-telephone').value = user.telephone || '';
                 document.getElementById('edit-role').value = user.role; 
                 document.getElementById('edit-actif').checked = user.actif;
                 
@@ -545,6 +563,7 @@
                 email: document.getElementById('edit-email').value,
                 nom: document.getElementById('edit-nom').value,
                 prenom: document.getElementById('edit-prenom').value,
+                telephone: document.getElementById('edit-telephone').value,
                 role: document.getElementById('edit-role').value,
                 actif: document.getElementById('edit-actif').checked,
                 password: document.getElementById('edit-password').value
@@ -777,6 +796,38 @@
                 row.style.display = text.includes(term) ? '' : 'none';
             });
         });
+
+        // Générer lien reset mot de passe
+        async function genererLienReset() {
+            const userId = document.getElementById('edit-user-id').value;
+            const username = document.getElementById('edit-username').value;
+            const email = document.getElementById('edit-email').value;
+            
+            if (!email) {
+                alert('❌ Cet utilisateur n\'a pas d\'adresse email configurée.');
+                return;
+            }
+            
+            if (!confirm(`Envoyer un email de réinitialisation à ${username} (${email}) ?`)) return;
+            
+            try {
+                const response = await fetch(`/api/utilisateurs/${userId}/generer-lien-reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ Email de réinitialisation envoyé avec succès !');
+                } else {
+                    alert(`❌ Erreur: ${data.error || 'Impossible d\'envoyer l\'email'}`);
+                }
+            } catch (e) {
+                alert('❌ Erreur de connexion');
+                console.error(e);
+            }
+        }
 
         // INIT
         document.addEventListener('DOMContentLoaded', () => {
