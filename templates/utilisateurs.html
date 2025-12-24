@@ -254,9 +254,9 @@
                                 <td>{{ user.derniere_connexion.strftime('%d/%m/%Y %H:%M') if user.derniere_connexion else 'Jamais' }}</td>
                                 <td>
                                     <button class="btn-action btn-edit" onclick="modifierUtilisateur({{ user.id }})"><i class="fas fa-edit"></i></button>
-                                    <button class="btn-action" style="background: #f39c12;" onclick="genererLienReset({{ user.id }}, '{{ user.username }}', '{{ user.email or \'\'  }}')"><i class="fas fa-key"></i></button>
+                                    <button class="btn-action" style="background: #f39c12;" onclick="genererLienReset({{ user.id }}, '{{ user.username|replace("'", "\\'") }}')"><i class="fas fa-key"></i></button>
                                     {% if user.id != current_user.id %}
-                                    <button class="btn-action btn-delete" onclick="supprimerUtilisateur({{ user.id }}, '{{ user.username }}')"><i class="fas fa-trash"></i></button>
+                                    <button class="btn-action btn-delete" onclick="supprimerUtilisateur({{ user.id }}, '{{ user.username|replace("'", "\\'") }}')"><i class="fas fa-trash"></i></button>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -561,28 +561,9 @@
         }
 
         async function supprimerUtilisateur(id, nom) {
-            if(!confirm('⚠️ Êtes-vous sûr de vouloir supprimer ' + nom + ' ?\n\nCette action est irréversible.')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/utilisateurs/' + id + '/supprimer', { 
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok && data.success) {
-                    alert('✅ Utilisateur supprimé avec succès !');
-                    location.reload();
-                } else {
-                    alert('❌ Erreur : ' + (data.error || 'Impossible de supprimer cet utilisateur'));
-                    console.error('Erreur de suppression:', data);
-                }
-            } catch (error) {
-                alert('❌ Erreur de connexion : ' + error.message);
-                console.error('Erreur:', error);
+            if(confirm(`Supprimer ${nom} ?`)) {
+                await fetch(`/api/utilisateurs/${id}/supprimer`, { method: 'DELETE' });
+                location.reload();
             }
         }
 
