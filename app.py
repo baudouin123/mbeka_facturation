@@ -90,19 +90,19 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # ✅ AJOUT : Configuration Email (Gmail) - Pour factures
-app.config['MAIL_SERVER'] = 'mail.grandit.net'
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'facturation@mbekafacturation.be'
-app.config['MAIL_PASSWORD'] = 'YannickSimba123@'
-app.config['MAIL_DEFAULT_SENDER'] = 'facturation@mbekafacturation.be'
+app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'
+app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'
+app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'
 
 # ✅ Configuration Email Reset Mot de Passe (Grandit.net)
 app.config['RESET_MAIL_SERVER'] = 'mail.grandit.net'
 app.config['RESET_MAIL_PORT'] = 587
 app.config['RESET_MAIL_USE_TLS'] = True
 app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
-app.config['RESET_MAIL_PASSWORD'] = 'YannickSimba123@'  # ← MODIFIEZ ICI AVEC LE VRAI MOT DE PASSE
+app.config['RESET_MAIL_PASSWORD'] = 'VOTRE_MOT_DE_PASSE_ICI'  # ⚠️ À REMPLIR
 app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
 
 # ✅ AJOUT : Configuration des sessions
@@ -2029,15 +2029,7 @@ def api_supprimer_utilisateur(user_id):
         # 3. Supprimer ses logs d'activité
         Log.query.filter_by(utilisateur_id=user_id).delete()
         
-        # 4. Anonymiser ses factures créées (ne pas les supprimer)
-        # Les factures restent mais sans lien vers l'utilisateur
-        from sqlalchemy import text
-        db.session.execute(
-            text("UPDATE facture SET created_by = NULL WHERE created_by = :user_id"),
-            {'user_id': user_id}
-        )
-        
-        # 5. Enfin, supprimer l'utilisateur
+        # 4. Enfin, supprimer l'utilisateur
         db.session.delete(user)
         db.session.commit()
 
