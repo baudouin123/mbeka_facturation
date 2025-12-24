@@ -6043,6 +6043,85 @@ def supprimer_utilisateur_api(user_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ============================================================================
+# 🚑 ZONE DE RÉPARATION - COLLES CECI À LA FIN DE APP.PY
+# ============================================================================
+
+@app.route('/api/utilisateurs/<int:user_id>/supprimer', methods=['DELETE'])
+@login_required
+@admin_required
+def force_delete_user(user_id):
+    """Suppression FORCEE d'un utilisateur et de toutes ses traces"""
+    try:
+        # 1. On récupère l'utilisateur
+        user = Utilisateur.query.get_or_404(user_id)
+
+        # 2. Sécurité : On ne se supprime pas soi-même
+        if user.id == current_user.id:
+            return jsonify({'success': False, 'error': 'Impossible de se supprimer soi-même !'}), 400
+
+        print(f"⚠️ Tentative de suppression de l'utilisateur : {user.username}")
+
+        # 3. NETTOYAGE MANUEL (C'est l'étape qui manquait !)
+        # On supprime tout ce qui est lié à lui pour débloquer la base de données
+        try:
+            # Supprime ses permissions spéciales
+            Permission.query.filter_by(utilisateur_id=user.id).delete()
+            
+            # Supprime ses messages de chat (s'il y en a)
+            try:
+                Message.query.filter_by(user_id=user.id).delete()
+                ConversationParticipant.query.filter_by(user_id=user.id).delete()
+            except:
+                pass # Pas grave si le chat n'est pas encore installé
+
+            # Détache ses logs (on garde l'historique mais on enlève son nom)
+            Log.query.filter_by(utilisateur_id=user.id).update({'utilisateur_id': None})
+            
+        except Exception as e_clean:
+            print(f"Erreur lors du nettoyage : {e_clean}")
+
+        # 4. Suppression finale
+        db.session.delete(user)
+        db.session.commit()
+        
+        print("✅ Utilisateur supprimé avec succès !")
+        return jsonify({'success': True, 'message': 'Utilisateur supprimé.'})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERREUR FATALE : {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/roles/<int:role_id>/supprimer', methods=['DELETE'])
+@login_required
+@admin_required
+def force_delete_role(role_id):
+    """Suppression FORCEE d'un rôle"""
+    try:
+        role = Role.query.get_or_404(role_id)
+        
+        # Sécurité
+        if role.est_systeme:
+            return jsonify({'success': False, 'error': 'On ne touche pas aux rôles système !'}), 400
+            
+        # On regarde si des gens ont encore ce rôle
+        nb_users = Utilisateur.query.filter_by(role=role.code).count()
+        if nb_users > 0:
+            return jsonify({'success': False, 'error': f'Impossible : {nb_users} utilisateurs ont encore ce rôle.'}), 400
+
+        # Nettoyage des permissions du rôle
+        RolePermission.query.filter_by(role_id=role.id).delete()
+        
+        db.session.delete(role)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ============================================================================
 # LANCEMENT LOCAL (Ignoré par Render, utilisé sur ton PC)
