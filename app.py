@@ -2,8 +2,7 @@
 APPLICATION WEB DE FACTURATION MBEKA - AVEC GESTION DES AMENDES
 Pour entreprises sous-traitantes avec gestion des amendes par employé
 """
-from gevent import monkey
-monkey.patch_all()
+
 from flask import Flask, render_template, request, send_file, jsonify, redirect, url_for, session, flash
 from flask_wtf.csrf import CSRFProtect
 from flask_sqlalchemy import SQLAlchemy
@@ -90,21 +89,13 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 20,  # ✅ OPTIMISATION : Connexions supplémentaires
 }
 
-# ✅ CONFIGURATION EMAIL - 2 COMPTES PROFESSIONNELS (GRANDIT.NET)
-# Serveur SMTP Grandit.net pour emails @mbekafacturation.be
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.grandit.net')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
+# ✅ AJOUT : Configuration Email (Gmail)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-
-# Email Facturation (Principal) - facturation@mbekafacturation.be
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'facturation@mbekafacturation.be')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
-app.config['MAIL_DEFAULT_SENDER'] = ('Mbeka Facturation', app.config['MAIL_USERNAME'])
-
-# Email Sécurité (Réinitialisation) - motdepasseoublier@mbekafacturation.be
-app.config['MAIL_SECURITY_USERNAME'] = os.environ.get('MAIL_SECURITY_USERNAME', 'motdepasseoublier@mbekafacturation.be')
-app.config['MAIL_SECURITY_PASSWORD'] = os.environ.get('MAIL_SECURITY_PASSWORD', '')
-app.config['MAIL_SECURITY_SENDER'] = ('Mbeka Facturation - Sécurité', app.config['MAIL_SECURITY_USERNAME'])
+app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'
+app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'
+app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'
 
 # ✅ AJOUT : Configuration des sessions
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -503,82 +494,54 @@ def comptable_ou_admin_required(f):
 # FONCTION D'ENVOI D'EMAIL
 # ============================================================================
 
-def send_email(to_email, subject, body, email_type='facturation'):
+def send_email(to_email, subject, body):
     """
-    Envoie un email via SMTP Grandit.net avec 2 comptes professionnels
-    
+    Envoie un email via Gmail SMTP
+
     Args:
         to_email (str): Adresse email du destinataire
         subject (str): Sujet de l'email
         body (str): Corps de l'email (HTML supporté)
-        email_type (str): 'facturation' ou 'security' - Détermine quel compte utiliser
-    
+
     Returns:
         tuple: (success: bool, message: str)
-    
-    Exemples:
-        # Réinitialisation mot de passe (compte sécurité)
-        send_email(user.email, "Reset password", html, email_type='security')
-        
-        # Facture (compte facturation)
-        send_email(client.email, "Facture #123", html, email_type='facturation')
     """
     try:
-        # Déterminer quel compte email utiliser
-        if email_type == 'security':
-            username = app.config['MAIL_SECURITY_USERNAME']
-            password = app.config['MAIL_SECURITY_PASSWORD']
-            sender_name, sender_email = app.config['MAIL_SECURITY_SENDER']
-        else:  # 'facturation' par défaut
-            username = app.config['MAIL_USERNAME']
-            password = app.config['MAIL_PASSWORD']
-            sender_name, sender_email = app.config['MAIL_DEFAULT_SENDER']
-        
-        # Logs pour debug (en production seulement)
-        if os.environ.get('DATABASE_URL'):
-            print(f"📧 Envoi email {email_type}: {sender_email} → {to_email}")
-        
+        # Vérifier que la configuration email est faite
+        if app.config['MAIL_USERNAME'] == 'votre.email@gmail.com':
+            return False, "Configuration email non faite. Voir app.py ligne 48-51"
+
         # Créer le message
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = f"{sender_name} <{sender_email}>"
+        msg['From'] = app.config['MAIL_DEFAULT_SENDER']
         msg['To'] = to_email
-        
-        # Ajouter le corps HTML
-        html_part = MIMEText(body, 'html', 'utf-8')
+        msg['Subject'] = subject
+
+        # Ajouter le corps (HTML)
+        html_part = MIMEText(body, 'html')
         msg.attach(html_part)
-        
-        # Connexion au serveur SMTP Grandit.net
+
+        # Connexion au serveur SMTP
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
-        server.login(username, password)
-        
+        server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
+
         # Envoyer l'email
         server.send_message(msg)
         server.quit()
-        
-        if os.environ.get('DATABASE_URL'):
-            print(f"✅ Email {email_type} envoyé avec succès à {to_email}")
-        
-        return True, f"Email envoyé avec succès à {to_email}"
-        
+
+        return True, "Email envoyé avec succès"
+
     except smtplib.SMTPAuthenticationError:
-        error_msg = "❌ Erreur d'authentification email (vérifiez username/password)"
-        print(error_msg)
-        return False, error_msg
+        return False, "Erreur d'authentification email. Vérifiez username/password."
     except smtplib.SMTPException as e:
-        error_msg = f"❌ Erreur SMTP : {str(e)}"
-        print(error_msg)
-        return False, error_msg
+        return False, f"Erreur SMTP: {str(e)}"
     except Exception as e:
-        error_msg = f"❌ Erreur lors de l'envoi : {str(e)}"
-        print(error_msg)
-        return False, error_msg
+        return False, f"Erreur: {str(e)}"
 
 def send_facture_email(facture, pdf_path):
     """
     Envoie une facture par email avec le PDF en pièce jointe
-    ✅ VERSION CORRIGÉE : Utilise le compte FACTURATION (facturation@mbekafacturation.be)
 
     Args:
         facture: Objet Facture de la BDD
@@ -588,26 +551,27 @@ def send_facture_email(facture, pdf_path):
         tuple: (success: bool, message: str)
     """
     try:
+        # Vérifier que la configuration email est faite
+        if app.config['MAIL_USERNAME'] == 'votre.email@gmail.com':
+            return False, "Configuration email non faite. Voir app.py ligne 48-51"
+
         # Déterminer le destinataire
         if facture.type_facture == 'client':
             if not facture.client or not facture.client.email:
                 return False, "Le client n'a pas d'adresse email configurée"
             to_email = facture.client.email
             destinataire_nom = facture.client.nom
-        else:  # employe
+        else: # employe
             if not facture.employe or not facture.employe.email:
                 return False, "L'employé n'a pas d'adresse email configurée"
             to_email = facture.employe.email
             destinataire_nom = f"{facture.employe.prenom} {facture.employe.nom}"
 
-        # ✅ CORRECTION : Utiliser le compte FACTURATION
-        username = app.config['MAIL_USERNAME']
-        password = app.config['MAIL_PASSWORD']
-        sender_name, sender_email = app.config['MAIL_DEFAULT_SENDER']
-
-        # Logs pour debug (en production seulement)
-        if os.environ.get('DATABASE_URL'):
-            print(f"📧 Envoi facture: {sender_email} → {to_email}")
+        # Créer le message
+        msg = MIMEMultipart()
+        msg['From'] = app.config['MAIL_DEFAULT_SENDER']
+        msg['To'] = to_email
+        msg['Subject'] = f"Facture {facture.numero} - {VOTRE_ENTREPRISE['nom']}"
 
         # Corps de l'email en HTML
         email_body = f"""
@@ -674,6 +638,15 @@ def send_facture_email(facture, pdf_path):
                 .footer p {{
                     margin: 5px 0;
                 }}
+                .btn-download {{
+                    display: inline-block;
+                    background: #667eea;
+                    color: white;
+                    padding: 12px 30px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                }}
             </style>
         </head>
         <body>
@@ -733,18 +706,13 @@ def send_facture_email(facture, pdf_path):
         </html>
         """
 
-        # Créer le message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f"Facture {facture.numero} - {VOTRE_ENTREPRISE['nom']}"
-        msg['From'] = f"{sender_name} <{sender_email}>"
-        msg['To'] = to_email
-
         # Ajouter le corps HTML
-        msg.attach(MIMEText(email_body, 'html', 'utf-8'))
+        msg.attach(MIMEText(email_body, 'html'))
 
         # Ajouter le PDF en pièce jointe
         try:
             # ✅ DEBUG : Vérifier que le fichier existe et sa taille
+            import os
             if not os.path.exists(pdf_path):
                 return False, f"Le fichier PDF n'existe pas : {pdf_path}"
 
@@ -781,15 +749,12 @@ def send_facture_email(facture, pdf_path):
         except Exception as e:
             return False, f"Erreur lors de la lecture du PDF: {str(e)}"
 
-        # ✅ CONNEXION AU SERVEUR SMTP GRANDIT.NET
+        # Connexion au serveur SMTP et envoi
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
-        server.login(username, password)
+        server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
         server.send_message(msg)
         server.quit()
-
-        if os.environ.get('DATABASE_URL'):
-            print(f"✅ Facture envoyée avec succès à {to_email}")
 
         return True, f"Facture envoyée avec succès à {to_email}"
 
@@ -2120,8 +2085,7 @@ def generer_lien_reset(user_id):
             success, message = send_email(
                 to_email=user.email,
                 subject="Réinitialisation de votre mot de passe - Mbeka",
-                body=email_body,
-                email_type='security'  # ✅ Utilise motdepasseoublier@mbekafacturation.be
+                body=email_body
             )
 
             email_sent = success
@@ -2602,66 +2566,6 @@ def handle_typing(data):
         'username': current_user.username,
         'is_typing': is_typing
     }, room=room, include_self=False)
-
-    # --- AJOUTER À LA FIN DE app.py OU AVEC LES AUTRES ROUTES API CHAT ---
-
-@app.route('/api/chat/messages/<int:message_id>', methods=['DELETE'])
-@login_required
-def supprimer_message(message_id):
-    msg = Message.query.get_or_404(message_id)
-    # Vérifier que c'est bien l'auteur qui supprime
-    if msg.expediteur_id != current_user.id:
-        return jsonify({'success': False, 'error': 'Non autorisé'}), 403
-    
-    db.session.delete(msg)
-    db.session.commit()
-    
-    # Notifier via SocketIO pour que le message disparaisse chez tout le monde
-    socketio.emit('message_deleted', {'message_id': message_id, 'conversation_id': msg.conversation_id})
-    return jsonify({'success': True})
-
-@app.route('/api/chat/groupes/<int:groupe_id>/modifier', methods=['POST'])
-@login_required
-def modifier_groupe(groupe_id):
-    data = request.json
-    groupe = Conversation.query.get_or_404(groupe_id)
-    
-    # Vérifier que l'utilisateur est membre
-    participant = Participant.query.filter_by(conversation_id=groupe.id, utilisateur_id=current_user.id).first()
-    if not participant:
-        return jsonify({'success': False, 'error': 'Non autorisé'}), 403
-        
-    if 'nom' in data:
-        groupe.nom = data['nom']
-        
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/chat/groupes/<int:groupe_id>/membres/<int:user_id>', methods=['DELETE'])
-@login_required
-def retirer_membre_groupe(groupe_id, user_id):
-    # Logique simplifiée : n'importe quel membre peut en retirer un autre (à sécuriser si besoin)
-    Participant.query.filter_by(conversation_id=groupe_id, utilisateur_id=user_id).delete()
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/chat/groupes/<int:groupe_id>/info', methods=['GET'])
-@login_required
-def info_groupe(groupe_id):
-    groupe = Conversation.query.get_or_404(groupe_id)
-    participants = db.session.query(Utilisateur).join(Participant).filter(Participant.conversation_id == groupe.id).all()
-    
-    membres_json = [{
-        'id': u.id,
-        'nom_complet': f"{u.prenom} {u.nom}",
-        'username': u.username
-    } for u in participants]
-    
-    return jsonify({
-        'success': True,
-        'nom': groupe.nom,
-        'membres': membres_json
-    })
 
 # ============================================================================
 # ROUTES POUR GÉNÉRER LES FACTURES
@@ -3258,15 +3162,8 @@ def clients():
 
     # Calculer les statistiques
     total_clients = len(clients_list)
-    
-    # FIX: Utiliser .count() au lieu de len() pour les relations SQLAlchemy
-    total_factures = sum(client.factures.count() for client in clients_list)
-    
-    # FIX: Charger explicitement les factures ou utiliser une requête optimisée
-    total_ca = 0
-    for client in clients_list:
-        for facture in client.factures:
-            total_ca += facture.total_net
+    total_factures = sum(len(client.factures) for client in clients_list)
+    total_ca = sum(sum(f.total_net for f in client.factures) for client in clients_list)
 
     return render_template('clients.html',
                            clients=clients_list,
@@ -5936,191 +5833,6 @@ def initialiser_application():
 # --- EXÉCUTION IMMÉDIATE DE L'INITIALISATION ---
 # C'est cette ligne qui sauve ton déploiement sur Render
 initialiser_application()
-
-# ============================================================================
-# API GESTION UTILISATEURS (CORRECTIFS POUR VOTRE PAGE)
-# ============================================================================
-
-@app.route('/api/utilisateurs/<int:user_id>', methods=['GET'])
-@login_required
-@admin_required
-def get_utilisateur_detail(user_id):
-    """Récupérer les détails d'un utilisateur pour modification"""
-    user = Utilisateur.query.get_or_404(user_id)
-    return jsonify(user.to_dict())
-
-@app.route('/api/utilisateurs/creer', methods=['POST'])
-@login_required
-@admin_required
-def creer_utilisateur_api():
-    """Créer un utilisateur via l'interface admin"""
-    try:
-        data = request.json
-        
-        # Vérifications
-        if Utilisateur.query.filter_by(username=data['username']).first():
-            return jsonify({'success': False, 'error': 'Ce nom d\'utilisateur existe déjà'}), 400
-        if Utilisateur.query.filter_by(email=data['email']).first():
-            return jsonify({'success': False, 'error': 'Cet email est déjà utilisé'}), 400
-
-        # Création
-        new_user = Utilisateur(
-            username=data['username'],
-            email=data['email'],
-            nom=data.get('nom'),
-            prenom=data.get('prenom'),
-            telephone=data.get('telephone'),
-            role=data.get('role', 'employe'),
-            actif=True
-        )
-        new_user.set_password(data['password'])
-        
-        db.session.add(new_user)
-        db.session.commit()
-        
-        # Log
-        creer_log('creation_utilisateur', f"Utilisateur {new_user.username} créé", current_user)
-        
-        return jsonify({'success': True, 'message': 'Utilisateur créé'})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/utilisateurs/<int:user_id>/modifier', methods=['PUT'])
-@login_required
-@admin_required
-def modifier_utilisateur_api(user_id):
-    """Modifier un utilisateur"""
-    try:
-        user = Utilisateur.query.get_or_404(user_id)
-        data = request.json
-        
-        # Mise à jour des champs
-        if 'email' in data: user.email = data['email']
-        if 'nom' in data: user.nom = data['nom']
-        if 'prenom' in data: user.prenom = data['prenom']
-        if 'role' in data: user.role = data['role']
-        if 'actif' in data: user.actif = data['actif']
-        if 'telephone' in data: user.telephone = data['telephone']
-        
-        # Mot de passe (seulement si fourni)
-        if data.get('password'):
-            user.set_password(data['password'])
-            
-        db.session.commit()
-        creer_log('modification_utilisateur', f"Utilisateur {user.username} modifié", current_user)
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/utilisateurs/<int:user_id>/supprimer', methods=['DELETE'])
-@login_required
-@admin_required
-def supprimer_utilisateur_api(user_id):
-    """Supprimer un utilisateur"""
-    try:
-        if user_id == current_user.id:
-            return jsonify({'success': False, 'error': 'Vous ne pouvez pas vous supprimer vous-même'}), 400
-            
-        user = Utilisateur.query.get_or_404(user_id)
-        
-        # Vérifier s'il a des données liées importantes (optionnel)
-        # db.session.delete(user) # Suppression physique
-        
-        # On préfère souvent désactiver plutôt que supprimer pour garder l'historique
-        # user.actif = False 
-        
-        # Si vous voulez vraiment supprimer :
-        db.session.delete(user)
-        db.session.commit()
-        
-        creer_log('suppression_utilisateur', f"Utilisateur {user.username} supprimé", current_user)
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# ============================================================================
-# 🚑 ZONE DE RÉPARATION - COLLES CECI À LA FIN DE APP.PY
-# ============================================================================
-
-@app.route('/api/utilisateurs/<int:user_id>/supprimer', methods=['DELETE'])
-@login_required
-@admin_required
-def force_delete_user(user_id):
-    """Suppression FORCEE d'un utilisateur et de toutes ses traces"""
-    try:
-        # 1. On récupère l'utilisateur
-        user = Utilisateur.query.get_or_404(user_id)
-
-        # 2. Sécurité : On ne se supprime pas soi-même
-        if user.id == current_user.id:
-            return jsonify({'success': False, 'error': 'Impossible de se supprimer soi-même !'}), 400
-
-        print(f"⚠️ Tentative de suppression de l'utilisateur : {user.username}")
-
-        # 3. NETTOYAGE MANUEL (C'est l'étape qui manquait !)
-        # On supprime tout ce qui est lié à lui pour débloquer la base de données
-        try:
-            # Supprime ses permissions spéciales
-            Permission.query.filter_by(utilisateur_id=user.id).delete()
-            
-            # Supprime ses messages de chat (s'il y en a)
-            try:
-                Message.query.filter_by(user_id=user.id).delete()
-                ConversationParticipant.query.filter_by(user_id=user.id).delete()
-            except:
-                pass # Pas grave si le chat n'est pas encore installé
-
-            # Détache ses logs (on garde l'historique mais on enlève son nom)
-            Log.query.filter_by(utilisateur_id=user.id).update({'utilisateur_id': None})
-            
-        except Exception as e_clean:
-            print(f"Erreur lors du nettoyage : {e_clean}")
-
-        # 4. Suppression finale
-        db.session.delete(user)
-        db.session.commit()
-        
-        print("✅ Utilisateur supprimé avec succès !")
-        return jsonify({'success': True, 'message': 'Utilisateur supprimé.'})
-
-    except Exception as e:
-        db.session.rollback()
-        print(f"❌ ERREUR FATALE : {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/roles/<int:role_id>/supprimer', methods=['DELETE'])
-@login_required
-@admin_required
-def force_delete_role(role_id):
-    """Suppression FORCEE d'un rôle"""
-    try:
-        role = Role.query.get_or_404(role_id)
-        
-        # Sécurité
-        if role.est_systeme:
-            return jsonify({'success': False, 'error': 'On ne touche pas aux rôles système !'}), 400
-            
-        # On regarde si des gens ont encore ce rôle
-        nb_users = Utilisateur.query.filter_by(role=role.code).count()
-        if nb_users > 0:
-            return jsonify({'success': False, 'error': f'Impossible : {nb_users} utilisateurs ont encore ce rôle.'}), 400
-
-        # Nettoyage des permissions du rôle
-        RolePermission.query.filter_by(role_id=role.id).delete()
-        
-        db.session.delete(role)
-        db.session.commit()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ============================================================================
