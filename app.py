@@ -90,13 +90,21 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 20,  # ✅ OPTIMISATION : Connexions supplémentaires
 }
 
-# ✅ AJOUT : Configuration Email (Gmail)
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
+# ✅ CONFIGURATION EMAIL - 2 COMPTES PROFESSIONNELS
+# Serveur SMTP (Office 365 pour emails @mbekafacturation.be)
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.office365.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'
-app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'
-app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'
+
+# Email Facturation (Principal) - facturation@mbekafacturation.be
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'facturation@mbekafacturation.be')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = ('Mbeka Facturation', app.config['MAIL_USERNAME'])
+
+# Email Sécurité (Réinitialisation) - motdepasseoublier@mbekafacturation.be
+app.config['MAIL_SECURITY_USERNAME'] = os.environ.get('MAIL_SECURITY_USERNAME', 'motdepasseoublier@mbekafacturation.be')
+app.config['MAIL_SECURITY_PASSWORD'] = os.environ.get('MAIL_SECURITY_PASSWORD', '')
+app.config['MAIL_SECURITY_SENDER'] = ('Mbeka Facturation - Sécurité', app.config['MAIL_SECURITY_USERNAME'])
 
 # ✅ AJOUT : Configuration des sessions
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -495,44 +503,55 @@ def comptable_ou_admin_required(f):
 # FONCTION D'ENVOI D'EMAIL
 # ============================================================================
 
-def send_email(to_email, subject, body):
+def send_email(to_email, subject, body, email_type='facturation'):
     """
-    Envoie un email via Gmail SMTP
-
+    Envoie un email via SMTP avec 2 comptes professionnels
+    
     Args:
         to_email (str): Adresse email du destinataire
         subject (str): Sujet de l'email
         body (str): Corps de l'email (HTML supporté)
-
+        email_type (str): 'facturation' ou 'security' - Détermine quel compte utiliser
+    
     Returns:
         tuple: (success: bool, message: str)
     """
     try:
-        # Vérifier que la configuration email est faite
-        if app.config['MAIL_USERNAME'] == 'votre.email@gmail.com':
-            return False, "Configuration email non faite. Voir app.py ligne 48-51"
-
+        # Déterminer quel compte email utiliser
+        if email_type == 'security':
+            username = app.config['MAIL_SECURITY_USERNAME']
+            password = app.config['MAIL_SECURITY_PASSWORD']
+            sender_name, sender_email = app.config['MAIL_SECURITY_SENDER']
+        else:  # 'facturation' par défaut
+            username = app.config['MAIL_USERNAME']
+            password = app.config['MAIL_PASSWORD']
+            sender_name, sender_email = app.config['MAIL_DEFAULT_SENDER']
+        
+        # Logs pour debug
+        if os.environ.get('DATABASE_URL'):
+            print(f"📧 Email {email_type}: {sender_email} → {to_email}")
+        
         # Créer le message
         msg = MIMEMultipart('alternative')
-        msg['From'] = app.config['MAIL_DEFAULT_SENDER']
-        msg['To'] = to_email
         msg['Subject'] = subject
-
-        # Ajouter le corps (HTML)
-        html_part = MIMEText(body, 'html')
+        msg['From'] = f"{sender_name} <{sender_email}>"
+        msg['To'] = to_email
+        
+        # Ajouter le corps HTML
+        html_part = MIMEText(body, 'html', 'utf-8')
         msg.attach(html_part)
-
+        
         # Connexion au serveur SMTP
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
-        server.login(app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-
+        server.login(username, password)
+        
         # Envoyer l'email
         server.send_message(msg)
         server.quit()
-
-        return True, "Email envoyé avec succès"
-
+        
+        return True, f"Email envoyé avec succès à {to_email}"
+        
     except smtplib.SMTPAuthenticationError:
         return False, "Erreur d'authentification email. Vérifiez username/password."
     except smtplib.SMTPException as e:
@@ -2086,7 +2105,8 @@ def generer_lien_reset(user_id):
             success, message = send_email(
                 to_email=user.email,
                 subject="Réinitialisation de votre mot de passe - Mbeka",
-                body=email_body
+                body=email_body,
+                email_type='security'  # ✅ Utilise motdepasseoublier@mbekafacturation.be
             )
 
             email_sent = success
@@ -3221,15 +3241,14 @@ def clients():
     """Page de gestion des clients"""
     clients_list = Client.query.order_by(Client.nom).all()
 
-    # ✅ CORRECTION : Utiliser .count() et .all() avec lazy='dynamic'
+    # Calculer les statistiques
     total_clients = len(clients_list)
-    total_factures = sum(client.factures.count() for client in clients_list)  # ← .count()
-    total_ca = sum(sum(f.total_net for f in client.factures.all()) for client in clients_list)  # ← .all()
+    total_factures = sum(len(client.factures) for client in clients_list)
+    total_ca = sum(sum(f.total_net for f in client.factures) for client in clients_list)
 
     return render_template('clients.html',
                            clients=clients_list,
                            entreprise=VOTRE_ENTREPRISE,
-                           now=datetime.now(),  # ✅ AJOUTÉ pour éviter erreur dans template
                            stats={
                                'total_clients': total_clients,
                                'total_factures': total_factures,
@@ -3762,15 +3781,13 @@ def supprimer_facture(facture_id):
 # ============================================================================
 
 @app.route('/saisie-journaliere')
-@login_required
 def saisie_journaliere():
     """Page de saisie des livraisons journalières"""
     employes = Employe.query.filter_by(actif=True).order_by(Employe.nom).all()
     return render_template('saisie_journaliere.html',
                          entreprise=VOTRE_ENTREPRISE,
-                         employes=employes,
-                        now=datetime.now())
-    
+                         employes=employes)
+
 @app.route('/api/livraisons', methods=['GET', 'POST'])
 def api_livraisons():
     """API pour gérer les livraisons"""
