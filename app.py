@@ -90,9 +90,9 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 20,  # ✅ OPTIMISATION : Connexions supplémentaires
 }
 
-# ✅ CONFIGURATION EMAIL - 2 COMPTES PROFESSIONNELS
-# Serveur SMTP (Office 365 pour emails @mbekafacturation.be)
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.office365.com')
+# ✅ CONFIGURATION EMAIL - 2 COMPTES PROFESSIONNELS (GRANDIT.NET)
+# Serveur SMTP Grandit.net pour emails @mbekafacturation.be
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.grandit.net')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
 app.config['MAIL_USE_TLS'] = True
 
@@ -505,7 +505,7 @@ def comptable_ou_admin_required(f):
 
 def send_email(to_email, subject, body, email_type='facturation'):
     """
-    Envoie un email via SMTP avec 2 comptes professionnels
+    Envoie un email via SMTP Grandit.net avec 2 comptes professionnels
     
     Args:
         to_email (str): Adresse email du destinataire
@@ -515,6 +515,13 @@ def send_email(to_email, subject, body, email_type='facturation'):
     
     Returns:
         tuple: (success: bool, message: str)
+    
+    Exemples:
+        # Réinitialisation mot de passe (compte sécurité)
+        send_email(user.email, "Reset password", html, email_type='security')
+        
+        # Facture (compte facturation)
+        send_email(client.email, "Facture #123", html, email_type='facturation')
     """
     try:
         # Déterminer quel compte email utiliser
@@ -527,9 +534,9 @@ def send_email(to_email, subject, body, email_type='facturation'):
             password = app.config['MAIL_PASSWORD']
             sender_name, sender_email = app.config['MAIL_DEFAULT_SENDER']
         
-        # Logs pour debug
+        # Logs pour debug (en production seulement)
         if os.environ.get('DATABASE_URL'):
-            print(f"📧 Email {email_type}: {sender_email} → {to_email}")
+            print(f"📧 Envoi email {email_type}: {sender_email} → {to_email}")
         
         # Créer le message
         msg = MIMEMultipart('alternative')
@@ -541,7 +548,7 @@ def send_email(to_email, subject, body, email_type='facturation'):
         html_part = MIMEText(body, 'html', 'utf-8')
         msg.attach(html_part)
         
-        # Connexion au serveur SMTP
+        # Connexion au serveur SMTP Grandit.net
         server = smtplib.SMTP(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
         server.starttls()
         server.login(username, password)
@@ -550,14 +557,23 @@ def send_email(to_email, subject, body, email_type='facturation'):
         server.send_message(msg)
         server.quit()
         
+        if os.environ.get('DATABASE_URL'):
+            print(f"✅ Email {email_type} envoyé avec succès à {to_email}")
+        
         return True, f"Email envoyé avec succès à {to_email}"
         
     except smtplib.SMTPAuthenticationError:
-        return False, "Erreur d'authentification email. Vérifiez username/password."
+        error_msg = "❌ Erreur d'authentification email (vérifiez username/password)"
+        print(error_msg)
+        return False, error_msg
     except smtplib.SMTPException as e:
-        return False, f"Erreur SMTP: {str(e)}"
+        error_msg = f"❌ Erreur SMTP : {str(e)}"
+        print(error_msg)
+        return False, error_msg
     except Exception as e:
-        return False, f"Erreur: {str(e)}"
+        error_msg = f"❌ Erreur lors de l'envoi : {str(e)}"
+        print(error_msg)
+        return False, error_msg
 
 def send_facture_email(facture, pdf_path):
     """
