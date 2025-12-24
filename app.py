@@ -90,19 +90,19 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # ✅ AJOUT : Configuration Email (Gmail) - Pour factures
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_SERVER'] = 'mail.grandit.net'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'
-app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'
-app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'
+app.config['MAIL_USERNAME'] = 'facturation@mbekafacturation.be'
+app.config['MAIL_PASSWORD'] = 'YannickSimba123@'
+app.config['MAIL_DEFAULT_SENDER'] = 'facturation@mbekafacturation.be'
 
 # ✅ Configuration Email Reset Mot de Passe (Grandit.net)
 app.config['RESET_MAIL_SERVER'] = 'mail.grandit.net'
 app.config['RESET_MAIL_PORT'] = 587
 app.config['RESET_MAIL_USE_TLS'] = True
 app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
-app.config['RESET_MAIL_PASSWORD'] = 'VOTRE_MOT_DE_PASSE_ICI'  # ⚠️ À REMPLIR
+app.config['RESET_MAIL_PASSWORD'] = 'YannickSimba123@'  # ⚠️ À REMPLIR
 app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
 
 # ✅ AJOUT : Configuration des sessions
