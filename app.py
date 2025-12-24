@@ -89,13 +89,21 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 20,  # ✅ OPTIMISATION : Connexions supplémentaires
 }
 
-# ✅ AJOUT : Configuration Email (Gmail)
+# ✅ AJOUT : Configuration Email (Gmail) - Pour factures
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'billjunior126@gmail.com'
-app.config['MAIL_PASSWORD'] = 'rqgmzqnirjlxjouk'
-app.config['MAIL_DEFAULT_SENDER'] = 'billjunior126@gmail.com'
+app.config['MAIL_USERNAME'] = 'facturation@mbekafacturation.be'
+app.config['MAIL_PASSWORD'] = 'YannickSimba123@'
+app.config['MAIL_DEFAULT_SENDER'] = 'facturation@mbekafacturation.be'
+
+# ✅ Configuration Email Reset Mot de Passe (Grandit.net)
+app.config['RESET_MAIL_SERVER'] = 'mail.grandit.net'
+app.config['RESET_MAIL_PORT'] = 587
+app.config['RESET_MAIL_USE_TLS'] = True
+app.config['RESET_MAIL_USERNAME'] = 'motdepasseoublier@mbekafacturation.be'
+app.config['RESET_MAIL_PASSWORD'] = 'YannickSimba123@'
+app.config['RESET_MAIL_SENDER'] = 'motdepasseoublier@mbekafacturation.be'
 
 # ✅ AJOUT : Configuration des sessions
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -538,6 +546,51 @@ def send_email(to_email, subject, body):
         return False, f"Erreur SMTP: {str(e)}"
     except Exception as e:
         return False, f"Erreur: {str(e)}"
+
+def send_reset_password_email(to_email, subject, body):
+    """
+    Envoie un email de réinitialisation de mot de passe via motdepasseoublier@mbekafacturation.be
+    
+    Args:
+        to_email (str): Adresse email du destinataire
+        subject (str): Sujet de l'email
+        body (str): Corps de l'email (HTML supporté)
+    
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    try:
+        # Vérifier que la configuration est complète
+        if app.config['RESET_MAIL_PASSWORD'] == 'VOTRE_MOT_DE_PASSE_ICI':
+            return False, "⚠️ Configuration du compte motdepasseoublier@mbekafacturation.be non complétée. Ajoutez le mot de passe dans app.py ligne ~100"
+        
+        # Créer le message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = app.config['RESET_MAIL_SENDER']
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        # Ajouter le corps HTML
+        html_part = MIMEText(body, 'html')
+        msg.attach(html_part)
+        
+        # Connexion au serveur SMTP Grandit
+        server = smtplib.SMTP(app.config['RESET_MAIL_SERVER'], app.config['RESET_MAIL_PORT'])
+        server.starttls()
+        server.login(app.config['RESET_MAIL_USERNAME'], app.config['RESET_MAIL_PASSWORD'])
+        
+        # Envoyer l'email
+        server.send_message(msg)
+        server.quit()
+        
+        return True, "Email de réinitialisation envoyé avec succès"
+    
+    except smtplib.SMTPAuthenticationError:
+        return False, "❌ Erreur d'authentification avec motdepasseoublier@mbekafacturation.be. Vérifiez le mot de passe."
+    except smtplib.SMTPException as e:
+        return False, f"❌ Erreur SMTP Grandit: {str(e)}"
+    except Exception as e:
+        return False, f"❌ Erreur lors de l'envoi: {str(e)}"
 
 def send_facture_email(facture, pdf_path):
     """
@@ -1749,8 +1802,8 @@ def forgot_password():
             </html>
             """
 
-            # Envoyer l'email
-            success, message = send_email(
+            # Envoyer l'email via le compte motdepasseoublier@mbekafacturation.be
+            success, message = send_reset_password_email(
                 to_email=user.email,
                 subject="Réinitialisation de votre mot de passe - Mbeka",
                 body=email_body
@@ -5888,4 +5941,3 @@ if __name__ == '__main__':
 
     port = int(os.environ.get('PORT', 10000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
-            
