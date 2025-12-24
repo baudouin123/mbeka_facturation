@@ -2068,3 +2068,13 @@ body {
         max-width: 100%;
     }
 }
+
+/* Fix login - texte visible */
+input.form-control {
+    color: #2C3E50 !important;
+}
+
+input.form-control::placeholder {
+    color: #999 !important;
+}
+
