@@ -1712,8 +1712,13 @@ def forgot_password():
         token = user.generate_reset_token()
         db.session.commit()
 
-        # Générer le lien
-        reset_link = f"http://localhost:5000/reset-password/{token}"
+        # Générer le lien avec l'URL correcte (Render en production, localhost en dev)
+        if os.environ.get('RENDER'):
+            # En production sur Render
+            reset_link = f"https://mbeka-facturation.onrender.com/reset-password/{token}"
+        else:
+            # En développement local
+            reset_link = f"http://localhost:10000/reset-password/{token}"
 
         # Essayer d'envoyer l'email (si configuré)
         if user.email:
@@ -1960,8 +1965,38 @@ def api_supprimer_utilisateur(user_id):
         if user.id == current_user.id:
             return jsonify({'error': 'Vous ne pouvez pas supprimer votre propre compte'}), 400
 
+        # CORRECTION: Supprimer toutes les références de l'utilisateur
+        
+        # 1. Supprimer ses participations aux conversations
+        ConversationParticipant.query.filter_by(user_id=user_id).delete()
+        
+        # 2. Supprimer ses messages dans le chat
+        Message.query.filter_by(user_id=user_id).delete()
+        
+        # 3. Supprimer ses conversations créées
+        Conversation.query.filter_by(created_by=user_id).delete()
+        
+        # 4. Supprimer ses logs d'activité
+        Log.query.filter_by(utilisateur_id=user_id).delete()
+        
+        # 5. Anonymiser ses factures créées (ne pas les supprimer)
+        # Les factures restent mais sans lien vers l'utilisateur
+        from sqlalchemy import text
+        db.session.execute(
+            text("UPDATE facture SET created_by = NULL WHERE created_by = :user_id"),
+            {'user_id': user_id}
+        )
+        
+        # 6. Enfin, supprimer l'utilisateur
         db.session.delete(user)
         db.session.commit()
+
+        # Log de l'action
+        log_action(
+            utilisateur_id=current_user.id,
+            action='suppression_utilisateur',
+            details=f"Suppression de l'utilisateur {user.username}"
+        )
 
         return jsonify({
             'success': True,
@@ -1970,7 +2005,8 @@ def api_supprimer_utilisateur(user_id):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        print(f"Erreur suppression utilisateur: {str(e)}")
+        return jsonify({'error': f'Erreur lors de la suppression: {str(e)}'}), 500
 
 @app.route('/api/utilisateurs/<int:user_id>/permissions', methods=['GET'])
 @admin_required
@@ -5852,3 +5888,4 @@ if __name__ == '__main__':
 
     port = int(os.environ.get('PORT', 10000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+            
