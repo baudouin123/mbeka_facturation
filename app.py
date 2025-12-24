@@ -5937,6 +5937,112 @@ def initialiser_application():
 # C'est cette ligne qui sauve ton déploiement sur Render
 initialiser_application()
 
+# ============================================================================
+# API GESTION UTILISATEURS (CORRECTIFS POUR VOTRE PAGE)
+# ============================================================================
+
+@app.route('/api/utilisateurs/<int:user_id>', methods=['GET'])
+@login_required
+@admin_required
+def get_utilisateur_detail(user_id):
+    """Récupérer les détails d'un utilisateur pour modification"""
+    user = Utilisateur.query.get_or_404(user_id)
+    return jsonify(user.to_dict())
+
+@app.route('/api/utilisateurs/creer', methods=['POST'])
+@login_required
+@admin_required
+def creer_utilisateur_api():
+    """Créer un utilisateur via l'interface admin"""
+    try:
+        data = request.json
+        
+        # Vérifications
+        if Utilisateur.query.filter_by(username=data['username']).first():
+            return jsonify({'success': False, 'error': 'Ce nom d\'utilisateur existe déjà'}), 400
+        if Utilisateur.query.filter_by(email=data['email']).first():
+            return jsonify({'success': False, 'error': 'Cet email est déjà utilisé'}), 400
+
+        # Création
+        new_user = Utilisateur(
+            username=data['username'],
+            email=data['email'],
+            nom=data.get('nom'),
+            prenom=data.get('prenom'),
+            telephone=data.get('telephone'),
+            role=data.get('role', 'employe'),
+            actif=True
+        )
+        new_user.set_password(data['password'])
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        # Log
+        creer_log('creation_utilisateur', f"Utilisateur {new_user.username} créé", current_user)
+        
+        return jsonify({'success': True, 'message': 'Utilisateur créé'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/utilisateurs/<int:user_id>/modifier', methods=['PUT'])
+@login_required
+@admin_required
+def modifier_utilisateur_api(user_id):
+    """Modifier un utilisateur"""
+    try:
+        user = Utilisateur.query.get_or_404(user_id)
+        data = request.json
+        
+        # Mise à jour des champs
+        if 'email' in data: user.email = data['email']
+        if 'nom' in data: user.nom = data['nom']
+        if 'prenom' in data: user.prenom = data['prenom']
+        if 'role' in data: user.role = data['role']
+        if 'actif' in data: user.actif = data['actif']
+        if 'telephone' in data: user.telephone = data['telephone']
+        
+        # Mot de passe (seulement si fourni)
+        if data.get('password'):
+            user.set_password(data['password'])
+            
+        db.session.commit()
+        creer_log('modification_utilisateur', f"Utilisateur {user.username} modifié", current_user)
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/utilisateurs/<int:user_id>/supprimer', methods=['DELETE'])
+@login_required
+@admin_required
+def supprimer_utilisateur_api(user_id):
+    """Supprimer un utilisateur"""
+    try:
+        if user_id == current_user.id:
+            return jsonify({'success': False, 'error': 'Vous ne pouvez pas vous supprimer vous-même'}), 400
+            
+        user = Utilisateur.query.get_or_404(user_id)
+        
+        # Vérifier s'il a des données liées importantes (optionnel)
+        # db.session.delete(user) # Suppression physique
+        
+        # On préfère souvent désactiver plutôt que supprimer pour garder l'historique
+        # user.actif = False 
+        
+        # Si vous voulez vraiment supprimer :
+        db.session.delete(user)
+        db.session.commit()
+        
+        creer_log('suppression_utilisateur', f"Utilisateur {user.username} supprimé", current_user)
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ============================================================================
 # LANCEMENT LOCAL (Ignoré par Render, utilisé sur ton PC)
