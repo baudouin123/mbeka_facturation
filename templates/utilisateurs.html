@@ -181,9 +181,7 @@
                 <button class="tab-btn active" onclick="switchTab('users')">
                     <i class="fas fa-users"></i> Utilisateurs
                 </button>
-                <button class="tab-btn" onclick="switchTab('roles')">
-                    <i class="fas fa-shield-alt"></i> Rôles & Permissions
-                </button>
+
             </div>
 
             <div id="tab-users" class="tab-content active">
@@ -198,8 +196,8 @@
                         <span class="summary-value">{{ utilisateurs|selectattr('role', 'equalto', 'admin')|list|length }}</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Connectés cette semaine</span>
-                        <span class="summary-value" id="connected-this-week">-</span>
+                        <span class="summary-label">Actifs</span>
+                        <span class="summary-value">{{ utilisateurs|selectattr('actif')|list|length }}</span>
                     </div>
                 </section>
 
@@ -266,23 +264,6 @@
                 </div>
             </div>
 
-            <div id="tab-roles" class="tab-content">
-                <div class="filters-container" style="justify-content: space-between;">
-                    <div>
-                        <h3>Gestion des Rôles</h3>
-                        <p style="color: #7f8c8d; margin: 0;">Définissez les permissions d'accès pour chaque type d'utilisateur.</p>
-                    </div>
-                    <button class="btn-add" onclick="ouvrirModalRole()">
-                        <i class="fas fa-plus-circle"></i> Créer un rôle
-                    </button>
-                </div>
-
-                <div id="listeRoles" class="roles-grid">
-                    <div style="text-align: center; grid-column: 1/-1; padding: 40px;">
-                        <i class="fas fa-spinner fa-spin fa-2x"></i> Chargement des rôles...
-                    </div>
-                </div>
-            </div>
 
         </main>
     </div>
@@ -752,7 +733,7 @@
                 const result = await res.json();
                 if(result.success) {
                     fermerModalRole();
-                    chargerRolesDynamiquement(); // Recharge tout
+                    // chargerRolesDynamiquement(); // Supprimé // Recharge tout
                 } else { alert(result.error); }
             } catch(e) { alert("Erreur sauvegarde"); }
         }
@@ -767,7 +748,7 @@
                     const result = await res.json();
                     
                     if(result.success) {
-                        chargerRolesDynamiquement();
+                        // chargerRolesDynamiquement(); // Supprimé
                     } else {
                         alert("Impossible de supprimer : " + (result.error || "Erreur inconnue"));
                     }
@@ -825,7 +806,7 @@
 
         // INIT
         document.addEventListener('DOMContentLoaded', () => {
-            chargerRolesDynamiquement();
+            // chargerRolesDynamiquement(); // Supprimé
             chargerStatistiquesUser();
         });
 
