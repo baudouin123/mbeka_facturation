@@ -90,7 +90,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # ✅ AJOUT : Configuration Email (Gandi.net) - Pour factures
-app.config['MAIL_SERVER'] = 'smtp.gandi.net'
+app.config['MAIL_SERVER'] = 'mail.gandi.net'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USE_TLS'] = True
@@ -99,7 +99,7 @@ app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'YannickSimba123@'
 app.config['MAIL_DEFAULT_SENDER'] = 'facturation@mbekafacturation.be'
 
 # ✅ Configuration Email Reset Mot de Passe (Gandi.net)
-app.config['RESET_MAIL_SERVER'] = 'smtp.gandi.net'
+app.config['RESET_MAIL_SERVER'] = 'mail.gandi.net'
 app.config['RESET_MAIL_PORT'] = 587
 app.config['RESET_MAIL_USE_SSL'] = False
 app.config['RESET_MAIL_USE_TLS'] = True
