@@ -209,7 +209,7 @@ class Utilisateur(UserMixin, db.Model):
         """Générer un token de réinitialisation unique"""
         import secrets
         self.reset_token = secrets.token_urlsafe(32)
-        self.reset_token_expiry = datetime.utcnow() + timedelta(hours=24) # Valide 24h
+        self.reset_token_expiry = datetime.utcnow() + timedelta(minutes=15) # Valide 15 minutes
         return self.reset_token
 
     def verify_reset_token(self, token):
@@ -1793,7 +1793,7 @@ def forgot_password():
                         Réinitialiser mon mot de passe
                     </a>
                 </p>
-                <p><strong>Ce lien est valide pendant 24 heures.</strong></p>
+                <p><strong>Ce lien est valide pendant 15 minutes.</strong></p>
                 <p style="color: #7f8c8d; font-size: 14px;">
                     Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.
                 </p>
@@ -2168,7 +2168,7 @@ def generer_lien_reset(user_id):
                     Réinitialiser mon mot de passe
                 </a>
             </p>
-            <p><strong>Ce lien est valide pendant 24 heures.</strong></p>
+            <p><strong>Ce lien est valide pendant 15 minutes.</strong></p>
             <p style="color: #7f8c8d; font-size: 14px;">
                 Si vous n'avez pas demandé cette réinitialisation, contactez un administrateur.
             </p>
