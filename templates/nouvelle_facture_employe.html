@@ -153,9 +153,12 @@
 
                     <!-- Actions -->
                     <div class="form-section">
-                        <div class="form-actions">
+                        <div class="form-actions" style="display: flex; gap: 15px; flex-wrap: wrap;">
                             <button type="button" class="btn-primary" onclick="genererBulletinLivraisons()">
                                 <i class="fas fa-file-pdf"></i> Générer le bulletin
+                            </button>
+                            <button type="button" class="btn-secondary" onclick="envoyerBulletinEmail()" style="background: #3498db;">
+                                <i class="fas fa-envelope"></i> Envoyer par email
                             </button>
                         </div>
                     </div>
@@ -389,6 +392,65 @@
                 console.error(error);
             }
         }
+
+        async function envoyerBulletinEmail() {
+            if (!inventaireActuel) {
+                alert('⚠️ Veuillez d\'abord charger l\'inventaire');
+                return;
+            }
+            
+            if (inventaireActuel.livraisons.length === 0) {
+                alert('⚠️ Aucune livraison pour générer un bulletin');
+                return;
+            }
+
+            // Vérifier que l'employé a un email
+            if (!inventaireActuel.employe.email) {
+                alert('❌ Cet employé n\'a pas d\'adresse email configurée.\n\nVeuillez d\'abord ajouter une adresse email dans la section "Employés".');
+                return;
+            }
+            
+            if (!confirm(`📧 Envoyer le bulletin de paie par email ?\n\nEmployé: ${inventaireActuel.employe.nom_complet}\nEmail: ${inventaireActuel.employe.email}\nPériode: ${inventaireActuel.periode.debut} au ${inventaireActuel.periode.fin}\nNet à payer: ${inventaireActuel.net_a_payer.toFixed(2)} €\n\nUn email sera envoyé avec le bulletin en pièce jointe.`)) {
+                return;
+            }
+            
+            // Préparer les données (même que pour la génération)
+            const data = {
+                numero_facture: 'new',
+                date_facture: new Date().toLocaleDateString('fr-FR'),
+                date_debut: inventaireActuel.periode.debut.split('/').reverse().join('-'),
+                date_fin: inventaireActuel.periode.fin.split('/').reverse().join('-'),
+                employe_id: inventaireActuel.employe.id,
+                total_brut: inventaireActuel.total_brut,
+                amendes_ids: inventaireActuel.amendes.map(a => a.id),
+                notes: `Livraisons du ${inventaireActuel.periode.debut} au ${inventaireActuel.periode.fin}\n${inventaireActuel.jours_travailles} jours travaillés\n${inventaireActuel.total_journaux} journaux livrés`,
+                livraisons: inventaireActuel.livraisons,
+                envoyer_email: true  // Indicateur pour envoyer par email
+            };
+            
+            try {
+                const response = await fetch('/generer-facture-employe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    if (result.email_sent) {
+                        alert('✅ Bulletin généré et envoyé par email à ' + inventaireActuel.employe.email);
+                    } else {
+                        alert('✅ Bulletin généré mais l\'email n\'a pas pu être envoyé.\n\n' + (result.email_error || ''));
+                    }
+                } else {
+                    alert('❌ Erreur: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion');
+                console.error(error);
+            }
+        }
     </script>
 
     <style>
@@ -489,4 +551,3 @@
     <script src="{{ url_for('static', filename='dark-mode.js') }}"></script>
 </body>
 </html>
-
