@@ -1902,7 +1902,7 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/utilisateurs')
-@admin_required
+@permission_required('utilisateurs')
 def utilisateurs():
     """Page de gestion des utilisateurs (admin only)"""
     users = Utilisateur.query.all()
@@ -1911,7 +1911,7 @@ def utilisateurs():
                            utilisateurs=users)
 
 @app.route('/api/utilisateurs', methods=['GET'])
-@admin_required
+@permission_required('utilisateurs')
 def api_liste_utilisateurs():
     """API: Liste des utilisateurs"""
     users = Utilisateur.query.all()
@@ -1931,7 +1931,7 @@ def api_get_utilisateur(user_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/utilisateurs/creer', methods=['POST'])
-@admin_required
+@permission_required('utilisateurs')
 def api_creer_utilisateur():
     """API: Créer un nouvel utilisateur"""
     try:
@@ -1983,7 +1983,7 @@ def api_creer_utilisateur():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/utilisateurs/<int:user_id>/modifier', methods=['PUT'])
-@admin_required
+@permission_required('utilisateurs')
 def api_modifier_utilisateur(user_id):
     """API: Modifier un utilisateur"""
     try:
@@ -2042,7 +2042,7 @@ def api_modifier_utilisateur(user_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/utilisateurs/<int:user_id>/supprimer', methods=['DELETE'])
-@admin_required
+@permission_required('utilisateurs')
 def api_supprimer_utilisateur(user_id):
     """API: Supprimer un utilisateur"""
     try:
@@ -2145,7 +2145,7 @@ def api_update_permissions(user_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/utilisateurs/<int:user_id>/generer-lien-reset', methods=['POST'])
-@admin_required
+@permission_required('utilisateurs')
 def generer_lien_reset(user_id):
     """Générer un lien de réinitialisation de mot de passe (admin uniquement)"""
     try:
