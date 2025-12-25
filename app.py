@@ -3019,10 +3019,25 @@ def generer_facture_employe():
 
         app.logger.info(f"✅ Bulletin {numero_facture} généré avec succès")
 
+        # Envoyer par email si demandé
+        email_sent = False
+        email_error = None
+        if data.get('envoyer_email'):
+            if employe.email:
+                success, message = send_facture_email(facture, chemin_pdf)
+                email_sent = success
+                if not success:
+                    email_error = message
+                    app.logger.warning(f"Erreur envoi email bulletin: {message}")
+            else:
+                email_error = "L'employé n'a pas d'adresse email"
+
         return jsonify({
             'success': True,
             'message': f'Bulletin {numero_facture} généré avec succès',
-            'download_url': f'/telecharger_facture/{facture.id}'
+            'download_url': f'/telecharger_facture/{facture.id}',
+            'email_sent': email_sent,
+            'email_error': email_error
         })
 
     except Exception as e:
