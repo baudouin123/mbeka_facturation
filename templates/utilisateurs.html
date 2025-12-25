@@ -295,9 +295,57 @@
                 </div>
                 <div class="form-group">
                     <label>Rôle *</label>
-                    <select id="create-role" class="form-control">
-                        <option value="employe">Chargement...</option>
-                    </select>
+                    <input type="text" id="create-role" class="form-control" placeholder="Ex: Comptable, Secrétaire, Manager..." required>
+                    <small style="color: #7f8c8d;">Donnez un nom personnalisé au rôle de cet utilisateur</small>
+                </div>
+                <div class="form-group">
+                    <label>Accès aux pages</label>
+                    <div class="permission-grid-modal" id="create-permissions-grid">
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-dashboard" value="dashboard">
+                            <label for="perm-create-dashboard">Dashboard & Graphiques</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-calendrier" value="calendrier">
+                            <label for="perm-create-calendrier">Calendrier</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-factures" value="factures">
+                            <label for="perm-create-factures">Liste des factures</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-nouvelle_facture_client" value="nouvelle_facture_client">
+                            <label for="perm-create-nouvelle_facture_client">Créer facture client</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-nouvelle_facture_employe" value="nouvelle_facture_employe">
+                            <label for="perm-create-nouvelle_facture_employe">Créer facture employé</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-clients" value="clients">
+                            <label for="perm-create-clients">Gestion clients</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-employes" value="employes">
+                            <label for="perm-create-employes">Gestion employés</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-recherche" value="recherche">
+                            <label for="perm-create-recherche">Recherche avancée</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-sauvegardes" value="sauvegardes">
+                            <label for="perm-create-sauvegardes">Sauvegardes</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-historique" value="historique">
+                            <label for="perm-create-historique">Historique</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-create-utilisateurs" value="utilisateurs">
+                            <label for="perm-create-utilisateurs">Gestion utilisateurs (Admin)</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Mot de passe *</label>
@@ -347,8 +395,57 @@
                 </div>
                 <div class="form-group">
                     <label>Rôle</label>
-                    <select id="edit-role" class="form-control">
-                    </select>
+                    <input type="text" id="edit-role" class="form-control" placeholder="Ex: Comptable, Secrétaire, Manager...">
+                    <small style="color: #7f8c8d;">Nom personnalisé du rôle</small>
+                </div>
+                <div class="form-group">
+                    <label>Accès aux pages</label>
+                    <div class="permission-grid-modal" id="edit-permissions-grid">
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-dashboard" value="dashboard">
+                            <label for="perm-edit-dashboard">Dashboard & Graphiques</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-calendrier" value="calendrier">
+                            <label for="perm-edit-calendrier">Calendrier</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-factures" value="factures">
+                            <label for="perm-edit-factures">Liste des factures</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-nouvelle_facture_client" value="nouvelle_facture_client">
+                            <label for="perm-edit-nouvelle_facture_client">Créer facture client</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-nouvelle_facture_employe" value="nouvelle_facture_employe">
+                            <label for="perm-edit-nouvelle_facture_employe">Créer facture employé</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-clients" value="clients">
+                            <label for="perm-edit-clients">Gestion clients</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-employes" value="employes">
+                            <label for="perm-edit-employes">Gestion employés</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-recherche" value="recherche">
+                            <label for="perm-edit-recherche">Recherche avancée</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-sauvegardes" value="sauvegardes">
+                            <label for="perm-edit-sauvegardes">Sauvegardes</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-historique" value="historique">
+                            <label for="perm-edit-historique">Historique</label>
+                        </div>
+                        <div class="permission-check-item">
+                            <input type="checkbox" id="perm-edit-utilisateurs" value="utilisateurs">
+                            <label for="perm-edit-utilisateurs">Gestion utilisateurs (Admin)</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Nouveau mot de passe (Laisser vide si inchangé)</label>
@@ -463,22 +560,17 @@
         // --- GESTION DES UTILISATEURS ---
         
         // Charger les statistiques user
-        async function chargerStatistiquesUser() {
-            try {
-                const response = await fetch('/api/utilisateurs/statistiques'); 
-                if (response.ok) {
-                    const data = await response.json();
-                    const el = document.getElementById('connected-this-week');
-                    if(el) el.textContent = data.connected_this_week || 0;
-                }
-            } catch(e) { console.log("Info stats indisponible"); }
-        }
-
         // --- MODALES UTILISATEURS ---
         function afficherModalCreer() { document.getElementById('modalCreer').style.display = 'block'; }
         function fermerModalCreer() { document.getElementById('modalCreer').style.display = 'none'; }
         
         async function creerUtilisateur() {
+            // Récupérer les permissions cochées
+            const permissions = [];
+            document.querySelectorAll('#create-permissions-grid input[type="checkbox"]:checked').forEach(cb => {
+                permissions.push(cb.value);
+            });
+
             const data = {
                 username: document.getElementById('new-username').value,
                 email: document.getElementById('new-email').value,
@@ -486,10 +578,14 @@
                 prenom: document.getElementById('new-prenom').value,
                 telephone: document.getElementById('new-telephone').value,
                 role: document.getElementById('create-role').value,
-                password: document.getElementById('new-password').value
+                password: document.getElementById('new-password').value,
+                permissions: permissions
             };
 
-            if(!data.username || !data.email || !data.password) { alert("Champs obligatoires manquants"); return; }
+            if(!data.username || !data.email || !data.password || !data.role) { 
+                alert("Champs obligatoires manquants (username, email, password, rôle)"); 
+                return; 
+            }
 
             try {
                 const res = await fetch('/api/utilisateurs/creer', {
@@ -521,12 +617,32 @@
                 document.getElementById('edit-role').value = user.role; 
                 document.getElementById('edit-actif').checked = user.actif;
                 
+                // Décocher toutes les permissions d'abord
+                document.querySelectorAll('#edit-permissions-grid input[type="checkbox"]').forEach(cb => {
+                    cb.checked = false;
+                });
+                
+                // Cocher les permissions de l'utilisateur
+                if(user.permissions && Array.isArray(user.permissions)) {
+                    user.permissions.forEach(perm => {
+                        const checkbox = document.getElementById('perm-edit-' + perm.page);
+                        if(checkbox) checkbox.checked = perm.actif;
+                    });
+                }
+                
                 document.getElementById('modalModifier').style.display = 'block';
             } catch(e) { alert("Erreur chargement utilisateur"); }
         }
 
         async function sauvegarderModification() {
             const userId = document.getElementById('edit-user-id').value;
+            
+            // Récupérer les permissions cochées
+            const permissions = [];
+            document.querySelectorAll('#edit-permissions-grid input[type="checkbox"]:checked').forEach(cb => {
+                permissions.push(cb.value);
+            });
+            
             const data = {
                 email: document.getElementById('edit-email').value,
                 nom: document.getElementById('edit-nom').value,
@@ -534,7 +650,8 @@
                 telephone: document.getElementById('edit-telephone').value,
                 role: document.getElementById('edit-role').value,
                 actif: document.getElementById('edit-actif').checked,
-                password: document.getElementById('edit-password').value
+                password: document.getElementById('edit-password').value,
+                permissions: permissions
             };
 
             try {
@@ -598,216 +715,11 @@
             }
         }
 
-        // --- GESTION DES RÔLES ---
+        // SECTION RÔLES SUPPRIMÉE - Gestion simplifiée
 
-        // Chargement initial des rôles (pour les selects et la grille)
-        async function chargerRolesDynamiquement() {
-            try {
-                const res = await fetch('/api/roles');
-                rolesCache = await res.json();
-                
-                // Remplir les Selects dans les modales utilisateurs
-                ['create-role', 'edit-role', 'filter-role'].forEach(id => {
-                    const select = document.getElementById(id);
-                    if(select) {
-                        const oldVal = select.value;
-                        select.innerHTML = id === 'filter-role' ? '<option value="">Tous</option>' : '';
-                        rolesCache.forEach(r => {
-                            const opt = document.createElement('option');
-                            opt.value = r.code;
-                            opt.textContent = r.nom + (r.est_systeme ? ' ⭐' : '');
-                            select.appendChild(opt);
-                        });
-                        if(oldVal) select.value = oldVal;
-                    }
-                });
-
-                // Appliquer les couleurs aux badges utilisateurs existants
-                document.querySelectorAll('.role-badge-user').forEach(badge => {
-                    const code = badge.getAttribute('data-role-code');
-                    const role = rolesCache.find(r => r.code === code);
-                    if(role) {
-                        badge.style.backgroundColor = role.couleur;
-                        badge.textContent = role.nom;
-                    }
-                });
-
-                // Charger la grille UI si on est sur l'onglet
-                chargerRolesUI();
-
-            } catch(e) { console.error("Erreur chargement rôles", e); }
-        }
-
-        // Afficher les cartes de rôles dans l'onglet Rôles
-        function chargerRolesUI() {
-            const container = document.getElementById('listeRoles');
-            if(!rolesCache.length) return;
-
-            container.innerHTML = rolesCache.map(role => `
-                <div class="role-card" style="border-left-color: ${role.couleur}">
-                    <div class="role-header">
-                        <h4 class="role-title" style="color:${role.couleur}">${role.nom}</h4>
-                        ${role.est_systeme ? '<span class="role-badge" style="background:#7f8c8d">Système</span>' : ''}
-                    </div>
-                    <div class="role-body">
-                        <div class="role-desc">${role.description || 'Aucune description'}</div>
-                        <small><strong>${Object.values(role.permissions).filter(v=>v).length}</strong> permissions actives</small>
-                        <br>
-                        <small><strong>${role.nb_utilisateurs || 0}</strong> utilisateurs assignés</small>
-                    </div>
-                    <div class="role-actions">
-                        <button class="btn-action btn-edit" style="flex:1" onclick="modifierRole(${role.id})"><i class="fas fa-edit"></i> Modifier</button>
-                        ${!role.est_systeme ? `<button class="btn-action btn-delete" onclick="supprimerRole(${role.id})" title="Supprimer"><i class="fas fa-trash"></i></button>` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // --- MODALE RÔLE ---
-        const modalRole = document.getElementById('modalRole');
-
-        function ouvrirModalRole() {
-            document.getElementById('modalRoleTitre').textContent = "Créer un rôle";
-            document.getElementById('roleId').value = "";
-            document.getElementById('roleNom').value = "";
-            document.getElementById('roleDescription').value = "";
-            document.getElementById('roleCouleur').value = "#3498db";
-            
-            // Reset checkboxes
-            genererGridPermissions({});
-            
-            modalRole.style.display = 'block';
-        }
-
-        function fermerModalRole() { modalRole.style.display = 'none'; }
-
-        function genererGridPermissions(permsActives = {}) {
-            const grid = document.getElementById('permissionsGrid');
-            grid.innerHTML = Object.entries(PAGES_DISPONIBLES).map(([code, label]) => `
-                <label class="permission-check-item">
-                    <input type="checkbox" value="${code}" ${permsActives[code] ? 'checked' : ''}>
-                    <span>${label}</span>
-                </label>
-            `).join('');
-        }
-
-        async function modifierRole(id) {
-            const role = rolesCache.find(r => r.id === id);
-            if(!role) return;
-
-            document.getElementById('modalRoleTitre').textContent = "Modifier " + role.nom;
-            document.getElementById('roleId').value = role.id;
-            document.getElementById('roleNom').value = role.nom;
-            document.getElementById('roleDescription').value = role.description;
-            document.getElementById('roleCouleur').value = role.couleur;
-            document.getElementById('previewBadge').style.background = role.couleur;
-
-            // Bloquer nom/couleur si système
-            document.getElementById('roleNom').disabled = role.est_systeme;
-            
-            genererGridPermissions(role.permissions);
-            modalRole.style.display = 'block';
-        }
-
-        async function sauvegarderRole() {
-            const id = document.getElementById('roleId').value;
-            const perms = {};
-            document.querySelectorAll('#permissionsGrid input').forEach(cb => perms[cb.value] = cb.checked);
-
-            const data = {
-                nom: document.getElementById('roleNom').value,
-                description: document.getElementById('roleDescription').value,
-                couleur: document.getElementById('roleCouleur').value,
-                permissions: perms
-            };
-
-            const url = id ? `/api/roles/${id}/modifier` : '/api/roles/creer';
-            const method = id ? 'PUT' : 'POST';
-
-            try {
-                const res = await fetch(url, {
-                    method: method,
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                const result = await res.json();
-                if(result.success) {
-                    fermerModalRole();
-                    // chargerRolesDynamiquement(); // Supprimé // Recharge tout
-                } else { alert(result.error); }
-            } catch(e) { alert("Erreur sauvegarde"); }
-        }
-
-        // --- SUPPRESSION RÔLE CORRIGÉE ---
-        async function supprimerRole(id) {
-            if(confirm("Attention : Supprimer ce rôle retirera les permissions associées. Continuer ?")) {
-                try {
-                    const res = await fetch(`/api/roles/${id}/supprimer`, { 
-                        method: 'DELETE'
-                    });
-                    const result = await res.json();
-                    
-                    if(result.success) {
-                        // chargerRolesDynamiquement(); // Supprimé
-                    } else {
-                        alert("Impossible de supprimer : " + (result.error || "Erreur inconnue"));
-                    }
-                } catch(e) {
-                    alert("Erreur serveur lors de la suppression du rôle.");
-                }
-            }
-        }
-
-        // Preview couleur
-        document.getElementById('roleCouleur').addEventListener('input', (e) => {
-            document.getElementById('previewBadge').style.background = e.target.value;
-        });
-
-        // Recherche utilisateur
-        document.getElementById('filter-search').addEventListener('keyup', (e) => {
-            const term = e.target.value.toLowerCase();
-            document.querySelectorAll('#users-tbody tr').forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
-            });
-        });
-
-        // Générer lien reset mot de passe
-        async function genererLienReset() {
-            const userId = document.getElementById('edit-user-id').value;
-            const username = document.getElementById('edit-username').value;
-            const email = document.getElementById('edit-email').value;
-            
-            if (!email) {
-                alert('❌ Cet utilisateur n\'a pas d\'adresse email configurée.');
-                return;
-            }
-            
-            if (!confirm(`Envoyer un email de réinitialisation à ${username} (${email}) ?`)) return;
-            
-            try {
-                const response = await fetch(`/api/utilisateurs/${userId}/generer-lien-reset`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    alert('✅ Email de réinitialisation envoyé avec succès !');
-                } else {
-                    alert(`❌ Erreur: ${data.error || 'Impossible d\'envoyer l\'email'}`);
-                }
-            } catch (e) {
-                alert('❌ Erreur de connexion');
-                console.error(e);
-            }
-        }
-
-        // INIT
         document.addEventListener('DOMContentLoaded', () => {
             // chargerRolesDynamiquement(); // Supprimé
-            chargerStatistiquesUser();
+            // chargerStatistiquesUser(); // Supprimé - statistiques non utilisées
         });
 
         // Fermeture modales clic extérieur
