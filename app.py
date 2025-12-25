@@ -285,7 +285,8 @@ class Utilisateur(UserMixin, db.Model):
             'actif': self.actif,
             'telephone': self.telephone,
             'date_creation': self.date_creation.strftime('%Y-%m-%d %H:%M') if self.date_creation else None,
-            'derniere_connexion': self.derniere_connexion.strftime('%Y-%m-%d %H:%M') if self.derniere_connexion else None
+            'derniere_connexion': self.derniere_connexion.strftime('%Y-%m-%d %H:%M') if self.derniere_connexion else None,
+            'permissions': [p.to_dict() for p in self.permissions]
         }
 
 # ============================================================================
@@ -1944,6 +1945,18 @@ def api_creer_utilisateur():
         user.set_password(data['password'])
 
         db.session.add(user)
+        db.session.flush()  # Pour obtenir l'ID
+
+        # Créer les permissions
+        permissions = data.get('permissions', [])
+        for page_key in permissions:
+            perm = Permission(
+                utilisateur_id=user.id,
+                page=page_key,
+                actif=True
+            )
+            db.session.add(perm)
+
         db.session.commit()
 
         return jsonify({
@@ -1988,6 +2001,20 @@ def api_modifier_utilisateur(user_id):
             user.actif = data['actif']
         if 'password' in data and data['password']:
             user.set_password(data['password'])
+
+        # Mettre à jour les permissions
+        if 'permissions' in data:
+            # Supprimer les anciennes permissions
+            Permission.query.filter_by(utilisateur_id=user.id).delete()
+            
+            # Créer les nouvelles permissions
+            for page_key in data['permissions']:
+                perm = Permission(
+                    utilisateur_id=user.id,
+                    page=page_key,
+                    actif=True
+                )
+                db.session.add(perm)
 
         db.session.commit()
 
