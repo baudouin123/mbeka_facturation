@@ -501,6 +501,19 @@ def comptable_ou_admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def permission_required(page_key):
+    """Décorateur pour vérifier si l'utilisateur a la permission d'accéder à une page"""
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def decorated_function(*args, **kwargs):
+            if not current_user.has_permission(page_key):
+                flash('Accès refusé. Vous n\'avez pas la permission d\'accéder à cette page.', 'danger')
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 # ============================================================================
 # FONCTION D'ENVOI D'EMAIL
 # ============================================================================
@@ -2270,14 +2283,14 @@ def dashboard():
                            entreprise=VOTRE_ENTREPRISE)
 
 @app.route('/calendrier')
-@login_required
+@permission_required('calendrier')
 def calendrier():
     """Page du calendrier/planning"""
     return render_template('calendrier.html',
                            entreprise=VOTRE_ENTREPRISE)
 
 @app.route('/nouvelle-facture-client')
-@comptable_ou_admin_required
+@permission_required('nouvelle_facture_client')
 def nouvelle_facture_client():
     """Page pour créer une facture client - OPTIMISÉE"""
     numero_auto = generer_numero_facture('client')
@@ -2293,7 +2306,7 @@ def nouvelle_facture_client():
                            employes=employes)
 
 @app.route('/nouvelle-facture-employe')
-@comptable_ou_admin_required
+@permission_required('nouvelle_facture_employe')
 def nouvelle_facture_employe():
     """Page pour créer une facture employé - OPTIMISÉE"""
     numero_auto = generer_numero_facture('employe')
@@ -3050,7 +3063,7 @@ def generer_facture_employe():
 # ============================================================================
 
 @app.route('/employes')
-@comptable_ou_admin_required
+@permission_required('employes')
 def employes():
     """Page de gestion des employés"""
     employes_list = Employe.query.order_by(Employe.nom, Employe.prenom).all()
@@ -3246,7 +3259,7 @@ def api_delete_amende(amende_id):
 # ============================================================================
 
 @app.route('/clients')
-@comptable_ou_admin_required
+@permission_required('clients')
 def clients():
     """Page de gestion des clients"""
     clients_list = Client.query.order_by(Client.nom).all()
@@ -3266,7 +3279,7 @@ def clients():
                            })
 
 @app.route('/factures')
-@login_required
+@permission_required('factures')
 def factures():
     """Page de gestion des factures"""
     factures_list = Facture.query.order_by(Facture.date_facture.desc()).all()
@@ -3281,7 +3294,7 @@ def factures():
                            entreprise=VOTRE_ENTREPRISE)
 
 @app.route('/historique')
-@login_required
+@permission_required('historique')
 def historique():
     """Page d'historique"""
     factures_list = Facture.query.order_by(Facture.date_facture.desc()).all()
@@ -4561,7 +4574,7 @@ def calendrier_employe():
 # ============================================================================
 
 @app.route('/recherche')
-@comptable_ou_admin_required
+@permission_required('recherche')
 def recherche():
     """Page de recherche avancée"""
     return render_template('recherche.html',
@@ -4973,7 +4986,7 @@ DB_PATH = 'instance/factures.db'
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 @app.route('/sauvegardes')
-@comptable_ou_admin_required
+@permission_required('sauvegardes')
 def sauvegardes():
     """Page de gestion des sauvegardes"""
     # Lister toutes les sauvegardes disponibles
