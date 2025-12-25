@@ -378,19 +378,6 @@
                         <input type="checkbox" id="edit-actif"> Compte actif
                     </label>
                 </div>
-                
-                <!-- NOUVEAU: Bouton générer lien reset -->
-                <div class="form-group" style="border-top: 2px dashed #e0e0e0; padding-top: 15px; margin-top: 15px;">
-                    <label style="display: block; margin-bottom: 10px;">
-                        <i class="fas fa-key"></i> Réinitialisation mot de passe
-                    </label>
-                    <button type="button" class="btn-secondary" onclick="genererLienReset()" style="width: 100%;">
-                        <i class="fas fa-envelope"></i> Générer et envoyer le lien de reset
-                    </button>
-                    <small style="display: block; margin-top: 8px; color: #7f8c8d;">
-                        Un email sera envoyé à l'utilisateur avec un lien pour réinitialiser son mot de passe
-                    </small>
-                </div>
             </div>
             <div class="modal-footer" style="flex-shrink: 0; border-top: 1px solid #e0e0e0; background: white;">
                 <button class="btn-logout" style="background: #95a5a6;" onclick="fermerModalModifier()">Annuler</button>
@@ -610,15 +597,22 @@
         }
 
         async function genererLienReset(id, nom) {
-            if(confirm(`Générer lien pour ${nom} ?`)) {
-                const res = await fetch(`/api/utilisateurs/${id}/generer-lien-reset`, { method: 'POST' });
-                const data = await res.json();
-                if(data.success) {
-                    document.getElementById('reset-info').innerHTML = `
-                        <strong>Lien :</strong> <a href="${data.reset_link}">${data.reset_link}</a><br>
-                        <br><em>Copiez ce lien et envoyez-le à l'utilisateur.</em>
-                    `;
-                    document.getElementById('modalReset').style.display = 'block';
+            if(confirm(`Envoyer un email de réinitialisation à ${nom} ?`)) {
+                try {
+                    const res = await fetch(`/api/utilisateurs/${id}/generer-lien-reset`, { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await res.json();
+                    
+                    if(res.ok && data.success) {
+                        alert('✅ ' + (data.message || 'Email envoyé avec succès'));
+                    } else {
+                        alert('❌ Erreur: ' + (data.error || 'Impossible d\'envoyer l\'email'));
+                    }
+                } catch(e) {
+                    console.error(e);
+                    alert('❌ Erreur de connexion au serveur');
                 }
             }
         }
