@@ -5477,8 +5477,8 @@ def modifier_document(document_id):
     """Modifier les métadonnées d'un document"""
     document = Document.query.get_or_404(document_id)
     
-    # Vérifier que le document appartient à l'utilisateur
-    if document.user_id != current_user.id:
+    # Vérifier que le document appartient à l'utilisateur OU que l'utilisateur est admin
+    if document.user_id != current_user.id and current_user.role != 'admin':
         return jsonify({'error': 'Accès non autorisé'}), 403
     
     try:
@@ -5516,7 +5516,8 @@ def modifier_document(document_id):
 def supprimer_document(document_id):
     document = Document.query.get_or_404(document_id)
     
-    if document.user_id != current_user.id:
+    # Vérifier que le document appartient à l'utilisateur OU que l'utilisateur est admin
+    if document.user_id != current_user.id and current_user.role != 'admin':
         return jsonify({'error': 'Non autorisé'}), 403
     
     try:
